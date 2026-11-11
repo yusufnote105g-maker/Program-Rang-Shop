@@ -8,13 +8,16 @@
 | Gradle wrapper | 2026-11-11 | done | Wrapper 8.9 добавлен (`gradlew`, `gradlew.bat`, `gradle/wrapper/`); `./gradlew :app:assembleDebug` не требует локального Gradle. |
 | S01 список задач | 2026-11-11 | done | Табы типов, шапка игрока, FAB, пустое состояние, snackbar наград. |
 | S02 создание | 2026-11-11 | done | Название/заметки/тип/сложность, валидация, сохранение в Room. |
-| S04 строка привычки | 2026-11-11 | done | Бейджи счётчиков «+N / −M» (`CounterBadge`) рядом с кнопками; при нуле не занимают места. |
+| S02 теги | 2026-11-11 | done | Чипы существующих тегов + новый тег; лимит 8, длина 24, сравнение без учёта регистра; `tags`/`task_tags`, показ в S01. |
+| S04 строка привычки | 2026-11-11 | done | Бейджи счётчиков «+N / −M» (`CounterBadge`) рядом с кнопками; при нуле не занимают места. Меню «⋮» и теги в строке. |
+| S06 редактирование | 2026-11-11 | done | Тап по строке или «⋮» → Edit; загрузка из Room, поля S02, тип read-only; удаление с подтверждением. |
+| S08 меню и удаление | 2026-11-11 | done | «⋮» → Edit/Delete; confirm-dialog с фокусом на «Отмена»; каскад `task_logs`/`task_tags`. Duplicate/Move не сделаны — should-фича остаётся partial. |
 | S05 фидбек | 2026-11-11 | partial | Snackbar наград + сообщение о пропущенных днях. Отдельного попапа с анимацией и модала level-up всё ещё нет. |
 | F06 ежедневный сброс | 2026-11-11 | done | `CronEngine` (календарь) + `DailyResetWorker` (WorkManager) + догон при старте. Идемпотентно по `last_cron_day`. |
 | День и часовой пояс | 2026-11-11 | done | Ключ дня считается в зоне пользователя и с учётом `day_start_minutes`; `observeToday()` питает UI. |
 | Тестовый прогон F01–F06 | 2026-11-11 | done | 74 кейса в `replica/test-plan.md`; 30 багов найдено и исправлено (S1 — 2, S2 — 10, S3 — 14, S4 — 4) в `fd0887b`. Отчёт: `replica/bugs.md`. |
-| Автотесты | 2026-11-11 | done | 15 JVM-тестов (`CronEngineTest`, `RewardEngineTest`) + 16 androidTest (`TaskRepositoryTest`, Room in-memory). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
-| Parity-дифф | 2026-11-11 | done | feature score 69.6/100, must-have 9/12, not shippable. Layout N/A: нет скриншотов оригинала/клона и эмулятора. Отчёт: `replica/parity.md`. |
+| Автотесты | 2026-11-11 | done | 20 JVM-тестов (`CronEngineTest`, `RewardEngineTest`, `TagRulesTest`) + 20 androidTest (`TaskRepositoryTest`, Room in-memory). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
+| Parity-дифф | 2026-11-11 | done | feature score 88.2/100, must-have 12/12, feature-гейт пройден. Layout N/A: нет скриншотов оригинала/клона и эмулятора; релиз не проверен сборкой. Отчёт: `replica/parity.md`. |
 
 ## Что сложнее, чем казалось
 
@@ -41,12 +44,12 @@
   клампинг HP, идемпотентность повторного запуска.
 - Статические проверки: XML/TOML валидны, все `R.string` и `Dimens` существуют,
   неиспользуемых импортов нет, скобки сбалансированы.
-- Написаны 15 JVM- и 16 androidTest-тестов. Запуск там, где есть SDK:
+- Написаны 20 JVM- и 20 androidTest-тестов. Запуск там, где есть SDK:
   `./gradlew :app:testDebugUnitTest` и `./gradlew :app:connectedDebugAndroidTest`.
 
 ## Следующие шаги
 
-1. S06/S08: редактирование и удаление (контекстное меню, подтверждение).
-2. Теги в S02 + фильтр по тегам в S01.
+1. S08: Duplicate/Move — контекстное меню станет полным.
+2. Теги: фильтр/группировка в S01.
 3. S05: модал level-up и анимация награды.
 4. Напоминания (`ReminderWorker`) — по образцу `DailyResetWorker`.

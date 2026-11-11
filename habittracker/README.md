@@ -29,29 +29,31 @@ app/src/main/java/com/example/habittracker/
 ├── data/
 │   ├── local/
 │   │   ├── entity/        UserEntity, TaskEntity, TagEntity, TaskTagEntity, TaskLogEntity
-│   │   ├── dao/           UserDao, TaskDao, TaskLogDao
+│   │   ├── dao/           UserDao, TaskDao, TagDao, TaskLogDao
 │   │   ├── AppDatabase.kt
 │   │   └── Mappers.kt     entity <-> domain
-│   ├── repository/        TaskRepository (транзакции, награды)
+│   ├── repository/        TaskRepository (транзакции, награды, теги)
 │   └── di/                DatabaseModule (Room, DAO, Clock)
 ├── domain/
-│   ├── model/             TaskType, Difficulty, Task, RewardResult, UserStats, DailyResetReport
+│   ├── model/             TaskType, Difficulty, Task, Tag, RewardResult, UserStats, DailyResetReport
 │   ├── cron/              CronEngine (календарь: due-дни, streak, граница дня)
-│   └── reward/            RewardEngine (математика наград)
+│   ├── reward/            RewardEngine (математика наград)
+│   └── tags/              TagRules (лимиты, trim, case-insensitive)
 ├── work/                  DailyResetWorker + DailyResetScheduler (WorkManager)
 ├── navigation/            AppNavHost, Routes
 └── ui/
     ├── theme/             Color, Type, Shape, Dimens, Theme (из replica/design)
-    ├── components/        TaskRow, CounterButton, CounterBadge, AvatarHeader, EmptyState, TaskListSkeleton
+    ├── components/        TaskRow, CounterButton, CounterBadge, AvatarHeader,
+    │                      EmptyState, TaskListSkeleton, TagDot, ConfirmDeleteDialog
     └── screens/
         ├── tasks/         S01 TasksScreen + TasksViewModel
-        └── addhabit/      S02 AddHabitScreen + AddHabitViewModel
+        └── taskform/      S02/S06 TaskFormScreen + TaskFormViewModel
 ```
 
 Тесты:
 
 ```
-app/src/test/java/.../domain/            CronEngineTest, RewardEngineTest (JVM)
+app/src/test/java/.../domain/            CronEngineTest, RewardEngineTest, TagRulesTest (JVM)
 app/src/androidTest/java/.../data/       TaskRepositoryTest (Room in-memory)
 ```
 
@@ -76,13 +78,21 @@ Gradle wrapper 8.9 уже в комплекте (`gradlew`, `gradlew.bat`,
 ## Что реализовано (этот срез)
 
 - **S01** — список задач: табы «Привычки / Ежедневные / Разовые», шапка игрока
-  (уровень/опыт/HP/золото), FAB, пустое состояние, snackbar с наградой.
-- **S02** — создание: название (валидация), заметки, тип, сложность; сохранение в Room.
-- **S04** — строка привычки со счётчиками «+N / −M» за сегодня.
+  (уровень/опыт/HP/золото), FAB, пустое состояние, snackbar с наградой, теги в строке.
+- **S02** — создание: название (валидация), заметки, тип, сложность, теги;
+  сохранение в Room.
+- **S04** — строка привычки со счётчиками «+N / −M» за сегодня и меню «⋮».
+- **S06** — редактирование: тап по строке или «⋮» → Edit; те же поля, что в S02,
+  тип после создания read-only, удаление с подтверждением.
+- **S08** — меню задачи: «⋮» → Edit / Delete; confirm-dialog с фокусом на «Отмена»,
+  каскадное удаление `task_logs` и `task_tags`.
+- **Теги** — чипы существующих тегов и создание новых на лету; лимит 8 тегов,
+  длина 24 символа, сравнение без учёта регистра; цвет стабилен для имени.
 - **F06** — ежедневный сброс: `DailyResetWorker` на границе дня пользователя, сброс серий
   за пропуски, штраф по HP, обнуление счётчиков; идемпотентно по `users.last_cron_day`
   и с догоном при каждом старте приложения.
-- **Room** — 5 таблиц из `replica/schema.sql`; транзакционные отметки, награды, журнал.
+- **Room** — 5 таблиц из `replica/schema.sql`; транзакционные отметки, награды,
+  журнал, теги.
 - **Дизайн-токены** — светлая/тёмная темы M3, отступы 4dp, формы M3.
 
 ## Как работает день и серия
@@ -96,11 +106,12 @@ Gradle wrapper 8.9 уже в комплекте (`gradlew`, `gradlew.bat`,
 
 ## Тесты
 
-- `app/src/test` — 15 JVM-тестов: `CronEngineTest` (due-дни, streak, monthly, every_x)
-  и `RewardEngineTest` (XP, уровни, клампинг HP).
-- `app/src/androidTest` — 16 тестов на Room in-memory: создание задачи, «+»/«−»,
+- `app/src/test` — 20 JVM-тестов: `CronEngineTest` (due-дни, streak, monthly, every_x),
+  `RewardEngineTest` (XP, уровни, клампинг HP) и `TagRulesTest` (trim, лимиты,
+  case-insensitive, эмодзи).
+- `app/src/androidTest` — 20 тестов на Room in-memory: создание задачи, «+»/«−»,
   guards для daily/todo, ежедневный cron, идемпотентность, откат часов назад,
-  сохранность истории при повторной вставке.
+  сохранность истории при повторной вставке, теги и каскадное удаление.
 - Запуск:
   `./gradlew :app:testDebugUnitTest` и `./gradlew :app:connectedDebugAndroidTest`.
 - В этом окружении тесты не запускались: нет JDK, Android SDK и эмулятора.
@@ -120,5 +131,5 @@ Gradle wrapper 8.9 уже в комплекте (`gradlew`, `gradlew.bat`,
 
 ## Дальше
 
-Редактирование/удаление (S06/S08), теги, модал level-up, напоминания.
-См. `../replica/build-log.md`.
+Duplicate/Move в меню S08, фильтр по тегам в S01, модал level-up, напоминания,
+аналитика. См. `../replica/build-log.md` и `../replica/parity.md`.
