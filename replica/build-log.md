@@ -13,6 +13,7 @@
 | День и часовой пояс | 2026-11-11 | done | Ключ дня считается в зоне пользователя и с учётом `day_start_minutes`; `observeToday()` питает UI. |
 | Тестовый прогон F01–F06 | 2026-11-11 | done | 74 кейса в `replica/test-plan.md`; 30 багов найдено и исправлено (S1 — 2, S2 — 10, S3 — 14, S4 — 4) в `fd0887b`. Отчёт: `replica/bugs.md`. |
 | Автотесты | 2026-11-11 | done | 15 JVM-тестов (`CronEngineTest`, `RewardEngineTest`) + 16 androidTest (`TaskRepositoryTest`, Room in-memory). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
+| Parity-дифф | 2026-11-11 | done | feature score 69.6/100, must-have 9/12, not shippable. Layout N/A: нет скриншотов оригинала/клона и эмулятора. Отчёт: `replica/parity.md`. |
 
 ## Что сложнее, чем казалось
 
