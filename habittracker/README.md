@@ -42,10 +42,17 @@ app/src/main/java/com/example/habittracker/
 ├── navigation/            AppNavHost, Routes
 └── ui/
     ├── theme/             Color, Type, Shape, Dimens, Theme (из replica/design)
-    ├── components/        TaskRow, CounterButton, CounterBadge, AvatarHeader, EmptyState
+    ├── components/        TaskRow, CounterButton, CounterBadge, AvatarHeader, EmptyState, TaskListSkeleton
     └── screens/
         ├── tasks/         S01 TasksScreen + TasksViewModel
         └── addhabit/      S02 AddHabitScreen + AddHabitViewModel
+```
+
+Тесты:
+
+```
+app/src/test/java/.../domain/            CronEngineTest, RewardEngineTest (JVM)
+app/src/androidTest/java/.../data/       TaskRepositoryTest (Room in-memory)
 ```
 
 ## Сборка
@@ -80,6 +87,30 @@ Gradle wrapper (`gradlew`) не сгенерирован — Android Studio со
 - Пропущенная нужная задача на сбросе: серия → 0, списание HP по сложности.
 - `DailyResetWorker` запускается раз в сутки со сдвигом на границу дня; WorkManager не
   гарантирует точность, поэтому сброс идемпотентен и догоняется при запуске приложения.
+
+## Тесты
+
+- `app/src/test` — 15 JVM-тестов: `CronEngineTest` (due-дни, streak, monthly, every_x)
+  и `RewardEngineTest` (XP, уровни, клампинг HP).
+- `app/src/androidTest` — 16 тестов на Room in-memory: создание задачи, «+»/«−»,
+  guards для daily/todo, ежедневный cron, идемпотентность, откат часов назад,
+  сохранность истории при повторной вставке.
+- Запуск:
+  `./gradlew :app:testDebugUnitTest` и `./gradlew :app:connectedDebugAndroidTest`.
+- В этом окружении тесты не запускались: нет JDK, Android SDK и эмулятора.
+  Что реально прогнано (SQLite, Python-модель логики, статика) — в
+  `../replica/test-plan.md`, найденные баги — в `../replica/bugs.md`.
+
+## Что исправлено тестовым прогоном
+
+- cron больше не обнуляет серию, заработанную позже закрываемого дня (S1).
+- `@Upsert` вместо `REPLACE`: история `task_logs` не удаляется каскадом (S1).
+- проверки типа и направления действия в репозитории, `dueToday`, тикер дня,
+  синхронизация часового пояса при старте.
+- обработка ошибок БД и отмена корутин: snackbar вместо краша, ограниченные ретраи.
+- i18n и a11y: строки в ресурсы, числовые подписи XP/HP, подписи чекбоксов,
+  тёмная тема системных баров.
+- форма создания переживает убийство процесса; длинные имя и заметки ограничены.
 
 ## Дальше
 

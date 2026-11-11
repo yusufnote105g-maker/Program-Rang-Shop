@@ -11,6 +11,8 @@
 | S05 фидбек | 2026-11-11 | partial | Snackbar наград + сообщение о пропущенных днях. Отдельного попапа с анимацией и модала level-up всё ещё нет. |
 | F06 ежедневный сброс | 2026-11-11 | done | `CronEngine` (календарь) + `DailyResetWorker` (WorkManager) + догон при старте. Идемпотентно по `last_cron_day`. |
 | День и часовой пояс | 2026-11-11 | done | Ключ дня считается в зоне пользователя и с учётом `day_start_minutes`; `observeToday()` питает UI. |
+| Тестовый прогон F01–F06 | 2026-11-11 | done | 74 кейса в `replica/test-plan.md`; 30 багов найдено и исправлено (S1 — 2, S2 — 10, S3 — 14, S4 — 4) в `fd0887b`. Отчёт: `replica/bugs.md`. |
+| Автотесты | 2026-11-11 | done | 15 JVM-тестов (`CronEngineTest`, `RewardEngineTest`) + 16 androidTest (`TaskRepositoryTest`, Room in-memory). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
 
 ## Что сложнее, чем казалось
 
@@ -29,10 +31,16 @@
 В окружении нет JDK/Gradle/Android SDK, поэтому:
 
 - `replica/schema.sql` прогнан на реальном SQLite (Python `sqlite3`): таблицы, индексы,
-  CHECK-и и запросы из `TaskDao` выполняются; `direction = 'miss'` принимается.
-- Логика `CronEngine` + `runDailyCron` портирована на Python и прогнана по сценариям:
+  CHECK-и, каскады и запросы из `TaskDao` выполняются; `direction = 'miss'` принимается;
+  emoji/акценты переживают round-trip; REPLACE каскадно удаляет логи, upsert — нет.
+- Логика `CronEngine` + `runDailyCron` портирована на Python и прогнана по 18 сценариям:
   пропуск дня, закрытие вовремя, пропуск нескольких дней, weekly по дням недели,
-  monthly 31-го, `every_x = 2`, клампинг HP, идемпотентность повторного запуска.
+  monthly 31-го, `every_x = 2`, граница `day_start_minutes`, смена зоны, DST,
+  клампинг HP, идемпотентность повторного запуска.
+- Статические проверки: XML/TOML валидны, все `R.string` и `Dimens` существуют,
+  неиспользуемых импортов нет, скобки сбалансированы.
+- Написаны 15 JVM- и 16 androidTest-тестов. Запуск там, где есть SDK:
+  `./gradlew :app:testDebugUnitTest` и `./gradlew :app:connectedDebugAndroidTest`.
 
 ## Следующие шаги
 
