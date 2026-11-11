@@ -3,6 +3,7 @@ package com.example.habittracker.data.di
 import android.content.Context
 import androidx.room.Room
 import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.dao.TagDao
 import com.example.habittracker.data.local.dao.TaskDao
 import com.example.habittracker.data.local.dao.TaskLogDao
 import com.example.habittracker.data.local.dao.UserDao
@@ -28,6 +29,9 @@ object DatabaseModule {
 
     @Provides
     fun provideTaskDao(db: AppDatabase): TaskDao = db.taskDao()
+
+    @Provides
+    fun provideTagDao(db: AppDatabase): TagDao = db.tagDao()
 
     @Provides
     fun provideTaskLogDao(db: AppDatabase): TaskLogDao = db.taskLogDao()

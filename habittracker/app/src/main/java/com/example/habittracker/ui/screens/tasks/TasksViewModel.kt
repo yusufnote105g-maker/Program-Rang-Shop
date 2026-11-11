@@ -33,8 +33,10 @@ data class TasksUiState(
 sealed interface TasksEvent {
     data class Reward(val result: RewardResult) : TasksEvent
     data class DailyReset(val missed: Int, val hpLost: Int) : TasksEvent
-    /** Отметка не применилась: например, задача уже удалена или БД недоступна. */
+    data object Deleted : TasksEvent
+    /** Отметка/удаление не применились: например, задача уже удалена или БД недоступна. */
     data object ActionFailed : TasksEvent
+    data object DeleteFailed : TasksEvent
 }
 
 @HiltViewModel
@@ -105,10 +107,11 @@ class TasksViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 repository.deleteTask(taskId)
+                events.send(TasksEvent.Deleted)
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
-                events.send(TasksEvent.ActionFailed)
+                events.send(TasksEvent.DeleteFailed)
             }
         }
     }

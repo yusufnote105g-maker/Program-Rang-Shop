@@ -2,11 +2,14 @@ package com.example.habittracker.data.repository
 
 import androidx.room.withTransaction
 import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.dao.TagDao
 import com.example.habittracker.data.local.dao.TaskDao
 import com.example.habittracker.data.local.dao.TaskLogDao
 import com.example.habittracker.data.local.dao.UserDao
+import com.example.habittracker.data.local.entity.TagEntity
 import com.example.habittracker.data.local.entity.TaskEntity
 import com.example.habittracker.data.local.entity.TaskLogEntity
+import com.example.habittracker.data.local.entity.TaskTagEntity
 import com.example.habittracker.data.local.entity.UserEntity
 import com.example.habittracker.data.local.toDomain
 import com.example.habittracker.data.local.toSchedule
@@ -15,10 +18,12 @@ import com.example.habittracker.domain.cron.CronEngine
 import com.example.habittracker.domain.model.DailyResetReport
 import com.example.habittracker.domain.model.Difficulty
 import com.example.habittracker.domain.model.RewardResult
+import com.example.habittracker.domain.model.Tag
 import com.example.habittracker.domain.model.Task
 import com.example.habittracker.domain.model.TaskType
 import com.example.habittracker.domain.model.UserStats
 import com.example.habittracker.domain.reward.RewardEngine
+import com.example.habittracker.domain.tags.TagRules
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -29,6 +34,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 import javax.inject.Inject
@@ -43,6 +49,7 @@ class TaskRepository @Inject constructor(
     private val db: AppDatabase,
     private val userDao: UserDao,
     private val taskDao: TaskDao,
+    private val tagDao: TagDao,
     private val taskLogDao: TaskLogDao,
     private val clock: Clock,
 ) {
@@ -67,13 +74,21 @@ class TaskRepository @Inject constructor(
             taskDao.observeByType(type.name),
             userDao.observeUser(),
             observeToday(),
-        ) { list, user, todayKey ->
+            tagDao.observeTaskTags(),
+        ) { list, user, todayKey, tagRows ->
             // Ключ дня приходит из тикера, поэтому dueToday пересчитывается
             // и на границе дня, а не только при изменении задачи/игрока.
             val today = runCatching { LocalDate.parse(todayKey) }.getOrNull()
                 ?: dayKey(user, clock.instant())
-            list.map { it.toDomain(today) }
+            val tagsByTask = tagRows.groupBy(
+                keySelector = { it.taskId },
+                valueTransform = { Tag(id = it.tagId, name = it.name, color = it.color) },
+            )
+            list.map { it.toDomain(today, tagsByTask[it.id].orEmpty()) }
         }
+
+    fun observeTags(): Flow<List<Tag>> =
+        tagDao.observeTags().map { list -> list.map { it.toDomain() } }
 
     /**
      * Гарантирует, что игрок существует, и держит его часовой пояс в актуальном
@@ -94,6 +109,7 @@ class TaskRepository @Inject constructor(
         difficulty: Difficulty,
         up: Boolean,
         down: Boolean,
+        tags: List<String> = emptyList(),
     ): String = db.withTransaction {
         val user = requireUser()
         val now = clock.millis()
@@ -114,7 +130,40 @@ class TaskRepository @Inject constructor(
                 updatedAt = now,
             ),
         )
+        replaceTags(user.id, id, tags)
         id
+    }
+
+    /** Загружает задачу для S06 вместе с тегами. */
+    suspend fun loadTask(taskId: String): Task? {
+        val task = taskDao.getById(taskId) ?: return null
+        val user = userDao.getUser()
+        val tags = tagDao.getTagsForTask(taskId).map { it.toDomain() }
+        return task.toDomain(dayKey(user, clock.instant()), tags)
+    }
+
+    /**
+     * S06: меняем только редактируемые поля. Тип, серия, счётчики и история
+     * остаются как есть — смена типа сломала бы инварианты БД и streak.
+     */
+    suspend fun updateTask(
+        taskId: String,
+        text: String,
+        notes: String,
+        difficulty: Difficulty,
+        tags: List<String>,
+    ): Boolean = db.withTransaction {
+        val task = taskDao.getById(taskId) ?: return@withTransaction false
+        taskDao.update(
+            task.copy(
+                text = text.trim(),
+                notes = notes.trim(),
+                difficulty = difficulty.name,
+                updatedAt = clock.millis(),
+            ),
+        )
+        replaceTags(task.userId, taskId, tags)
+        true
     }
 
     /**
@@ -267,6 +316,27 @@ class TaskRepository @Inject constructor(
         taskDao.deleteById(taskId)
     }
 
+    /** Полностью заменяет набор тегов задачи. Новые теги создаются на лету. */
+    private suspend fun replaceTags(userId: String, taskId: String, rawTags: List<String>) {
+        tagDao.clearTaskTags(taskId)
+        val now = clock.millis()
+        TagRules.normalize(rawTags).forEach { name ->
+            val tag = tagDao.findByName(userId, name) ?: TagEntity(
+                id = UUID.randomUUID().toString(),
+                userId = userId,
+                name = name,
+                color = tagColor(name),
+                createdAt = now,
+                updatedAt = now,
+            ).also { tagDao.upsert(it) }
+            tagDao.insertTaskTag(TaskTagEntity(taskId = taskId, tagId = tag.id))
+        }
+    }
+
+    /** Стабильный цвет из палитры токенов: один и тот же тег всегда одного цвета. */
+    private fun tagColor(name: String): String =
+        TAG_PALETTE[Math.floorMod(name.lowercase(Locale.ROOT).hashCode(), TAG_PALETTE.size)]
+
     /**
      * Ежедневный сброс (F06). Идемпотентен: если `last_cron_day` уже равен сегодняшнему
      * дню, ничего не делает и возвращает null.
@@ -395,5 +465,15 @@ class TaskRepository @Inject constructor(
 
         /** Минимальная пауза тикера дня — защита от нулевой задержки на границе. */
         const val MIN_TICK_MILLIS = 1_000L
+
+        /** Цвета из replica/design/tokens.json; цвет тега — данные, не UI-стиль. */
+        val TAG_PALETTE = listOf(
+            "#3A4ED8", // accent
+            "#1E7A4D", // success
+            "#8A5A00", // warning
+            "#4E5A6B", // secondary
+            "#B3261E", // danger
+            "#8A6A00", // gold
+        )
     }
 }

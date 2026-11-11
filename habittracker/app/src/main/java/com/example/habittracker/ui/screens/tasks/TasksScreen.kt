@@ -25,7 +25,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -33,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.habittracker.R
 import com.example.habittracker.domain.model.TaskType
 import com.example.habittracker.ui.components.AvatarHeader
+import com.example.habittracker.ui.components.ConfirmDeleteDialog
 import com.example.habittracker.ui.components.EmptyState
 import com.example.habittracker.ui.components.TaskListSkeleton
 import com.example.habittracker.ui.components.TaskRow
@@ -43,11 +47,14 @@ import com.example.habittracker.ui.theme.Dimens
 @Composable
 fun TasksScreen(
     onAddTask: (TaskType) -> Unit,
+    onEditTask: (String) -> Unit,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    var pendingDeleteId by rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingDelete = state.tasks.firstOrNull { it.id == pendingDeleteId }
 
     LaunchedEffect(Unit) {
         viewModel.uiEvents.collect { event ->
@@ -71,6 +78,8 @@ fun TasksScreen(
                         context.getString(R.string.cron_missed_no_hp, event.missed)
                     }
 
+                TasksEvent.Deleted -> context.getString(R.string.task_deleted)
+                TasksEvent.DeleteFailed -> context.getString(R.string.delete_failed)
                 TasksEvent.ActionFailed -> context.getString(R.string.action_failed)
             }
             snackbarHostState.showSnackbar(message)
@@ -125,11 +134,25 @@ fun TasksScreen(
                             onPlus = { viewModel.tapPlus(task.id) },
                             onMinus = { viewModel.tapMinus(task.id) },
                             onComplete = { viewModel.completeTodo(task.id) },
+                            onEdit = { onEditTask(task.id) },
+                            onDelete = { pendingDeleteId = task.id },
                         )
                     }
                 }
             }
         }
+    }
+
+    val taskToDelete = pendingDelete
+    if (taskToDelete != null) {
+        ConfirmDeleteDialog(
+            taskName = taskToDelete.text,
+            onConfirm = {
+                pendingDeleteId = null
+                viewModel.deleteTask(taskToDelete.id)
+            },
+            onDismiss = { pendingDeleteId = null },
+        )
     }
 }
 

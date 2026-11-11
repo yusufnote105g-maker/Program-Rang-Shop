@@ -44,7 +44,7 @@ class TaskRepositoryTest {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = TaskRepository(db, db.userDao(), db.taskDao(), db.taskLogDao(), clock)
+        repository = TaskRepository(db, db.userDao(), db.taskDao(), db.tagDao(), db.taskLogDao(), clock)
 
         // Игрок создаётся один раз; зону фиксируем, чтобы «сегодня» не зависело от телефона.
         repository.ensureUser()
@@ -74,6 +74,103 @@ class TaskRepositoryTest {
         assertEquals(1, tasks.size)
         assertEquals("Пить воду", tasks.single().text)
         assertTrue(tasks.single().dueToday)
+    }
+
+    // --- отметки привычки (F02 / F03 / S04) ---
+
+    @Test
+    fun createTask_withTags_storesThemAndReusesNamesIgnoringCase() = runBlocking {
+        val first = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Бег",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = true,
+            tags = listOf("здоровье", "утро"),
+        )
+        val second = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Растяжка",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = true,
+            tags = listOf("Здоровье"),
+        )
+
+        val tasks = repository.observeTasks(TaskType.HABIT).first()
+        assertEquals(
+            setOf("здоровье", "утро"),
+            tasks.first { it.id == first }.tags.map { it.name }.toSet(),
+        )
+        assertEquals(
+            setOf("здоровье"),
+            tasks.first { it.id == second }.tags.map { it.name }.toSet(),
+        )
+        assertEquals(
+            "«Здоровье» и «здоровье» — один тег",
+            2,
+            db.tagDao().observeTags().first().size,
+        )
+    }
+
+    @Test
+    fun updateTask_changesFieldsAndReplacesTags_butKeepsHistory() = runBlocking {
+        val id = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Старое имя",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = true,
+            tags = listOf("дом"),
+        )
+        repository.tapPlus(id)
+
+        val updated = repository.updateTask(
+            taskId = id,
+            text = "  Новое имя  ",
+            notes = "  заметка  ",
+            difficulty = Difficulty.HARD,
+            tags = listOf("работа", "утро"),
+        )
+
+        assertTrue(updated)
+        val task = repository.loadTask(id)!!
+        assertEquals("Новое имя", task.text)
+        assertEquals("заметка", task.notes)
+        assertEquals(Difficulty.HARD, task.difficulty)
+        assertEquals(setOf("работа", "утро"), task.tags.map { it.name }.toSet())
+        assertEquals("История отметок не должна пропадать", 1, db.taskLogDao().countAll())
+    }
+
+    @Test
+    fun updateTask_returnsFalse_whenTaskIsGone() = runBlocking {
+        assertFalse(
+            repository.updateTask("missing", "Имя", "", Difficulty.EASY, emptyList()),
+        )
+    }
+
+    @Test
+    fun deleteTask_removesLogsAndTagLinks_butKeepsTags() = runBlocking {
+        val id = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Удаляемая",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = true,
+            tags = listOf("спорт"),
+        )
+        repository.tapPlus(id)
+
+        repository.deleteTask(id)
+
+        assertNull(db.taskDao().getById(id))
+        assertEquals("Логи удаляются каскадом", 0, db.taskLogDao().countAll())
+        assertEquals("Связи с тегами удаляются каскадом", 0, db.tagDao().countTaskTags(id))
+        assertEquals("Сам тег остаётся для других задач", 1, db.tagDao().observeTags().first().size)
     }
 
     // --- отметки привычки (F02 / F03 / S04) ---

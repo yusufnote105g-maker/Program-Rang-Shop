@@ -16,6 +16,13 @@ enum class Difficulty(val xp: Int, val gold: Int, val hpPenalty: Int) {
 
 enum class Frequency { DAILY, WEEKLY, MONTHLY }
 
+/** Тег задачи (S02/S06/S01). Цвет хранится строкой #RRGGBB. */
+data class Tag(
+    val id: String,
+    val name: String,
+    val color: String = "#888888",
+)
+
 /** Доменная модель задачи (не зависит от Room). */
 data class Task(
     val id: String,
@@ -38,6 +45,7 @@ data class Task(
     val completed: Boolean = false,
     val position: Int = 0,
     val archived: Boolean = false,
+    val tags: List<Tag> = emptyList(),
 )
 
 /** Итог отметки — для всплывающего фидбека (S05). */

@@ -57,4 +57,36 @@
     <string name="save">Сохранить</string>
     <string name="save_failed">Не удалось сохранить. Попробуйте ещё раз.</string>
     <string name="back">Назад</string>
+
+    <!-- S02/S06: теги -->
+    <string name="field_tags">Теги</string>
+    <string name="tags_hint">Выберите существующие или создайте новый тег.</string>
+    <string name="tag_new">Новый тег</string>
+    <string name="tag_new_hint">Например, здоровье</string>
+    <string name="tag_add">Добавить тег</string>
+    <string name="tag_empty">Введите название тега</string>
+    <string name="tag_too_long">Название тега — не больше %1$d символов</string>
+    <string name="tag_limit">Можно выбрать не больше %1$d тегов</string>
+    <string name="tag_duplicate">Этот тег уже добавлен</string>
+    <string name="tags_limit_hint">Не больше %1$d тегов на задачу.</string>
+    <string name="tags_a11y">Теги: %1$s</string>
+
+    <!-- S06: редактирование -->
+    <string name="edit_task_title">Редактировать задачу</string>
+    <string name="edit_type_hint">Тип задачи после создания не меняется.</string>
+    <string name="loading_task">Загружаем задачу</string>
+    <string name="task_not_found">Задача не найдена</string>
+    <string name="task_not_found_body">Возможно, её уже удалили.</string>
+    <string name="back_to_list">Вернуться к списку</string>
+
+    <!-- S08: меню и удаление -->
+    <string name="edit_task">Редактировать</string>
+    <string name="task_actions_a11y">Действия с задачей: %1$s</string>
+    <string name="delete_task_a11y">Удалить задачу: %1$s</string>
+    <string name="delete">Удалить</string>
+    <string name="delete_task_title">Удалить задачу?</string>
+    <string name="delete_task_body">«%1$s» и вся её история будут удалены. Это необратимо.</string>
+    <string name="task_deleted">Задача удалена</string>
+    <string name="delete_failed">Не удалось удалить. Попробуйте ещё раз.</string>
+    <string name="cancel">Отмена</string>
 </resources>

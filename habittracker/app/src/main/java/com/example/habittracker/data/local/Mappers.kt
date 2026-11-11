@@ -1,11 +1,13 @@
 package com.example.habittracker.data.local
 
 import com.example.habittracker.data.local.entity.TaskEntity
+import com.example.habittracker.data.local.entity.TagEntity
 import com.example.habittracker.data.local.entity.UserEntity
 import com.example.habittracker.domain.cron.CronEngine
 import com.example.habittracker.domain.cron.TaskSchedule
 import com.example.habittracker.domain.model.Difficulty
 import com.example.habittracker.domain.model.Frequency
+import com.example.habittracker.domain.model.Tag
 import com.example.habittracker.domain.model.Task
 import com.example.habittracker.domain.model.TaskType
 import com.example.habittracker.domain.model.UserStats
@@ -16,8 +18,9 @@ import java.time.LocalDate
  * @param today локальный день пользователя. Если передан, задача знает,
  *   нужна ли она сегодня (`dueToday`) — это нужно для серых чекбоксов
  *   у ежедневных с расписанием.
+ * @param tags теги задачи; подтягиваются отдельным join-запросом.
  */
-fun TaskEntity.toDomain(today: LocalDate? = null): Task = Task(
+fun TaskEntity.toDomain(today: LocalDate? = null, tags: List<Tag> = emptyList()): Task = Task(
     id = id,
     type = enumOrDefault(type, TaskType.HABIT),
     text = text,
@@ -36,7 +39,10 @@ fun TaskEntity.toDomain(today: LocalDate? = null): Task = Task(
     completed = completed,
     position = position,
     archived = archived,
+    tags = tags,
 )
+
+fun TagEntity.toDomain(): Tag = Tag(id = id, name = name, color = color)
 
 /** Расписание для календарной логики (CronEngine). */
 fun TaskEntity.toSchedule(): TaskSchedule = TaskSchedule(
