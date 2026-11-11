@@ -380,6 +380,171 @@ class TaskRepositoryTest {
         assertEquals("Привычка 2", db.taskDao().getById(id)!!.text)
     }
 
+    // --- дублирование и перенос (S08) ---
+
+    @Test
+    fun duplicateTask_copiesTagsButResetsProgress() = runBlocking {
+        val id = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Бег",
+            notes = "утром",
+            difficulty = Difficulty.MEDIUM,
+            up = true,
+            down = true,
+            tags = listOf("спорт"),
+        )
+        repository.tapPlus(id)
+
+        val copy = repository.duplicateTask(id)!!
+
+        assertTrue("Должна появиться новая строка", copy.id != id)
+        val original = db.taskDao().getById(id)!!
+        val duplicated = db.taskDao().getById(copy.id)!!
+        assertEquals(original.text, duplicated.text)
+        assertEquals(original.notes, duplicated.notes)
+        assertEquals(original.difficulty, duplicated.difficulty)
+        assertEquals(0, duplicated.counterUp)
+        assertEquals(0, duplicated.streak)
+        assertEquals(1, db.tagDao().countTaskTags(copy.id))
+        assertEquals("История копии не переносится", 1, db.taskLogDao().countAll())
+    }
+
+    @Test
+    fun moveTask_resetsTypeFields_butKeepsTagsAndHistory() = runBlocking {
+        val id = repository.createTask(
+            type = TaskType.DAILY,
+            text = "Чтение",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = false,
+            tags = listOf("вечер"),
+        )
+        repository.tapPlus(id)
+        assertEquals(1, db.taskDao().getById(id)!!.streak)
+
+        assertTrue(repository.moveTask(id, TaskType.HABIT))
+
+        val moved = db.taskDao().getById(id)!!
+        assertEquals(TaskType.HABIT.name, moved.type)
+        assertEquals(0, moved.streak)
+        assertEquals(0, moved.counterUp)
+        assertEquals(null, moved.lastCompletedDay)
+        assertTrue("Минус появляется только у привычки", moved.down)
+        assertEquals(1, db.tagDao().countTaskTags(id))
+        assertEquals("История не удаляется при переносе", 1, db.taskLogDao().countAll())
+    }
+
+    // --- напоминания (should) ---
+
+    @Test
+    fun reminder_daily_reschedulesNextDay() = runBlocking {
+        val past = clock.millis() - 60 * 60 * 1000
+        val id = repository.createTask(
+            type = TaskType.DAILY,
+            text = "Полить цветы",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = false,
+            reminderEnabled = true,
+            reminderAt = past,
+        )
+
+        val firing = repository.onReminderFired(id)!!
+
+        assertNotNull(firing.nextTriggerAt)
+        assertTrue(firing.nextTriggerAt!! > clock.millis())
+        val task = db.taskDao().getById(id)!!
+        assertTrue(task.reminderEnabled)
+        assertEquals(firing.nextTriggerAt, task.reminderAt)
+    }
+
+    @Test
+    fun reminder_todo_isDisabledAfterSingleFiring() = runBlocking {
+        val past = clock.millis() - 60 * 60 * 1000
+        val id = repository.createTask(
+            type = TaskType.TODO,
+            text = "Позвонить",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = false,
+            reminderEnabled = true,
+            reminderAt = past,
+        )
+
+        val firing = repository.onReminderFired(id)!!
+
+        assertEquals(null, firing.nextTriggerAt)
+        val task = db.taskDao().getById(id)!!
+        assertFalse(task.reminderEnabled)
+        assertEquals(null, task.reminderAt)
+    }
+
+    @Test
+    fun updateTask_canDisableReminder() = runBlocking {
+        val id = repository.createTask(
+            type = TaskType.HABIT,
+            text = "Вода",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            up = true,
+            down = true,
+            reminderEnabled = true,
+            reminderAt = clock.millis() + 60_000,
+        )
+
+        repository.updateTask(
+            taskId = id,
+            text = "Вода",
+            notes = "",
+            difficulty = Difficulty.EASY,
+            tags = emptyList(),
+            reminderEnabled = false,
+        )
+
+        val task = db.taskDao().getById(id)!!
+        assertFalse(task.reminderEnabled)
+        assertEquals(null, task.reminderAt)
+    }
+
+    // --- аналитика и виджет (could) ---
+
+    @Test
+    fun analytics_countsHistoryAndFillsEveryDay() = runBlocking {
+        val habit = repository.createTask(TaskType.HABIT, "Зарядка", "", Difficulty.EASY, up = true, down = true)
+        repository.tapPlus(habit)
+        val todo = repository.createTask(TaskType.TODO, "Позвонить", "", Difficulty.MEDIUM, up = true, down = false)
+        repository.completeTodo(todo)
+
+        val analytics = repository.observeAnalytics(7).first()
+
+        assertEquals(7, analytics.daily.size)
+        assertEquals(today, analytics.daily.last().day)
+        assertEquals(2, analytics.totalCompletions)
+        assertEquals(Difficulty.EASY.xp + Difficulty.MEDIUM.xp, analytics.xpEarned)
+        assertEquals(Difficulty.EASY.gold + Difficulty.MEDIUM.gold, analytics.goldEarned)
+        assertTrue(analytics.hasHistory)
+    }
+
+    @Test
+    fun widgetSnapshot_reflectsTodayProgress() = runBlocking {
+        repository.createTask(TaskType.HABIT, "Зарядка", "", Difficulty.EASY, up = true, down = true)
+        val daily = repository.createTask(TaskType.DAILY, "Чтение", "", Difficulty.EASY, up = true, down = false)
+        repository.tapPlus(daily)
+        repository.createTask(TaskType.TODO, "Позвонить", "", Difficulty.EASY, up = true, down = false)
+
+        val widget = repository.widgetSnapshot()
+
+        assertEquals(1, widget.habits)
+        assertEquals(1, widget.dailiesDue)
+        assertEquals(1, widget.dailiesDone)
+        assertEquals(1, widget.todosOpen)
+        assertEquals(1, widget.bestStreak)
+        assertEquals("Чтение", widget.bestStreakText)
+    }
+
     // --- helpers ---
 
     private suspend fun seedDaily(

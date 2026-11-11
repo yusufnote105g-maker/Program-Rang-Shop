@@ -8,12 +8,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.habittracker.domain.model.TaskType
+import com.example.habittracker.ui.screens.analytics.AnalyticsScreen
 import com.example.habittracker.ui.screens.taskform.TaskFormScreen
 import com.example.habittracker.ui.screens.taskform.TaskFormViewModel
 import com.example.habittracker.ui.screens.tasks.TasksScreen
 
 object Routes {
     const val TASKS = "tasks"
+    const val ANALYTICS = "analytics"
 
     /** Тип новой задачи передаём аргументом, иначе «+» на вкладке всегда открывал бы привычку. */
     const val ADD = "add?type={type}"
@@ -33,7 +35,11 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             TasksScreen(
                 onAddTask = { type -> navController.navigate(Routes.add(type)) },
                 onEditTask = { taskId -> navController.navigate(Routes.edit(taskId)) },
+                onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
             )
+        }
+        composable(Routes.ANALYTICS) {
+            AnalyticsScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = Routes.ADD,

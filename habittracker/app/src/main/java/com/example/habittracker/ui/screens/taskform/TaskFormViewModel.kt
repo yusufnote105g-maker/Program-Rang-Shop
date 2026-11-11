@@ -7,7 +7,10 @@ import com.example.habittracker.data.repository.TaskRepository
 import com.example.habittracker.domain.model.Difficulty
 import com.example.habittracker.domain.model.Tag
 import com.example.habittracker.domain.model.TaskType
+import com.example.habittracker.domain.reminder.ReminderTime
 import com.example.habittracker.domain.tags.TagRules
+import com.example.habittracker.widget.WidgetUpdater
+import com.example.habittracker.work.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class TaskFormUiState(
@@ -29,6 +33,9 @@ data class TaskFormUiState(
     val selectedTags: List<String> = emptyList(),
     val tagDraft: String = "",
     val tagError: TagRules.Error? = null,
+    val reminderEnabled: Boolean = false,
+    val reminderHour: Int = ReminderTime.DEFAULT_HOUR,
+    val reminderMinute: Int = ReminderTime.DEFAULT_MINUTE,
     val nameError: Boolean = false,
     val loading: Boolean = false,
     val loadFailed: Boolean = false,
@@ -54,6 +61,8 @@ sealed interface TaskFormEvent {
 @HiltViewModel
 class TaskFormViewModel @Inject constructor(
     private val repository: TaskRepository,
+    private val reminderScheduler: ReminderScheduler,
+    private val widgetUpdater: WidgetUpdater,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -80,6 +89,11 @@ class TaskFormViewModel @Inject constructor(
                     ?.let { raw -> Difficulty.entries.firstOrNull { it.name == raw } }
                     ?: Difficulty.EASY,
                 selectedTags = savedStateHandle.get<ArrayList<String>>(KEY_TAGS)?.toList().orEmpty(),
+                reminderEnabled = savedStateHandle.get<Boolean>(KEY_REMINDER_ENABLED) ?: false,
+                reminderHour = savedStateHandle.get<Int>(KEY_REMINDER_HOUR)
+                    ?: ReminderTime.DEFAULT_HOUR,
+                reminderMinute = savedStateHandle.get<Int>(KEY_REMINDER_MINUTE)
+                    ?: ReminderTime.DEFAULT_MINUTE,
             )
         },
     )
@@ -126,6 +140,23 @@ class TaskFormViewModel @Inject constructor(
         _state.update { it.copy(difficulty = difficulty) }
     }
 
+    fun setReminderEnabled(enabled: Boolean) {
+        if (!isEdit) savedStateHandle[KEY_REMINDER_ENABLED] = enabled
+        _state.update { it.copy(reminderEnabled = enabled) }
+    }
+
+    fun setReminderTime(hour: Int, minute: Int) {
+        val safeHour = hour.coerceIn(0, 23)
+        val safeMinute = minute.coerceIn(0, 59)
+        if (!isEdit) {
+            savedStateHandle[KEY_REMINDER_HOUR] = safeHour
+            savedStateHandle[KEY_REMINDER_MINUTE] = safeMinute
+        }
+        _state.update {
+            it.copy(reminderHour = safeHour, reminderMinute = safeMinute)
+        }
+    }
+
     fun setTagDraft(value: String) {
         val limited = value.limitCodePoints(MAX_TAG_INPUT)
         _state.update { it.copy(tagDraft = limited, tagError = null) }
@@ -169,13 +200,23 @@ class TaskFormViewModel @Inject constructor(
             _state.update { it.copy(nameError = true) }
             return
         }
+        val reminderAt = if (current.reminderEnabled) {
+            ReminderTime.nextTrigger(
+                nowMillis = System.currentTimeMillis(),
+                hour = current.reminderHour,
+                minute = current.reminderMinute,
+                zone = ZoneId.systemDefault(),
+            )
+        } else {
+            null
+        }
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
             try {
                 repository.ensureUser()
                 val id = taskId
                 if (id == null) {
-                    repository.createTask(
+                    val newId = repository.createTask(
                         type = current.type,
                         text = current.name,
                         notes = current.notes,
@@ -183,18 +224,25 @@ class TaskFormViewModel @Inject constructor(
                         up = true,
                         down = current.type == TaskType.HABIT,
                         tags = current.selectedTags,
+                        reminderEnabled = current.reminderEnabled,
+                        reminderAt = reminderAt,
                     )
+                    if (reminderAt != null) {
+                        reminderScheduler.schedule(newId, reminderAt, current.name)
+                    }
                     // Задача уже в БД: чистим черновик, чтобы после убийства процесса
                     // до возврата на список форма не сохранила дубль повторным Save.
                     savedStateHandle[KEY_NAME] = ""
                     savedStateHandle[KEY_NOTES] = ""
                     savedStateHandle[KEY_TAGS] = ArrayList<String>()
+                    savedStateHandle[KEY_REMINDER_ENABLED] = false
                     _state.update {
                         it.copy(
                             name = "",
                             notes = "",
                             selectedTags = emptyList(),
                             tagDraft = "",
+                            reminderEnabled = false,
                             saving = false,
                         )
                     }
@@ -205,14 +253,22 @@ class TaskFormViewModel @Inject constructor(
                         notes = current.notes,
                         difficulty = current.difficulty,
                         tags = current.selectedTags,
+                        reminderEnabled = current.reminderEnabled,
+                        reminderAt = reminderAt,
                     )
                     if (!updated) {
                         // Задачу удалили, пока форма была открыта.
                         _state.update { it.copy(saving = false, loadFailed = true) }
                         return@launch
                     }
+                    if (reminderAt != null) {
+                        reminderScheduler.schedule(id, reminderAt, current.name)
+                    } else {
+                        reminderScheduler.cancel(id)
+                    }
                     _state.update { it.copy(saving = false) }
                 }
+                widgetUpdater.refresh()
                 _events.send(TaskFormEvent.Saved)
             } catch (c: CancellationException) {
                 // Отмена ViewModel — не ошибка сохранения, пробрасываем дальше.
@@ -232,6 +288,8 @@ class TaskFormViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 repository.deleteTask(id)
+                reminderScheduler.cancel(id)
+                widgetUpdater.refresh()
                 _state.update { it.copy(deleting = false) }
                 _events.send(TaskFormEvent.Deleted)
             } catch (c: CancellationException) {
@@ -259,6 +317,9 @@ class TaskFormViewModel @Inject constructor(
                         notes = task.notes,
                         difficulty = task.difficulty,
                         selectedTags = task.tags.map { tag -> tag.name },
+                        reminderEnabled = task.reminderEnabled,
+                        reminderHour = ReminderTime.hourOf(task.reminderAt, ZoneId.systemDefault()),
+                        reminderMinute = ReminderTime.minuteOf(task.reminderAt, ZoneId.systemDefault()),
                     )
                 }
             } catch (c: CancellationException) {
@@ -290,6 +351,9 @@ class TaskFormViewModel @Inject constructor(
         private const val KEY_NOTES = "form_notes"
         private const val KEY_DIFFICULTY = "form_difficulty"
         private const val KEY_TAGS = "form_tags"
+        private const val KEY_REMINDER_ENABLED = "form_reminder_enabled"
+        private const val KEY_REMINDER_HOUR = "form_reminder_hour"
+        private const val KEY_REMINDER_MINUTE = "form_reminder_minute"
 
         /** Лимит названия: длиннее всё равно не прочитать в строке списка. */
         private const val MAX_NAME_LENGTH = 120

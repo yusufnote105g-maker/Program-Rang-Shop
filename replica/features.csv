@@ -14,11 +14,11 @@ Streak (серия) для ежедневных задач,streaks,must,yes,yes,
 Повышение уровня,награды,should,yes,yes,RewardEngine.applyXp
 Потеря HP за пропуск/минус,награды,should,yes,yes,минус списывает HP
 Пустое состояние списка,список,should,yes,yes,S07 EmptyState
-Теги и группировка задач,теги,should,yes,partial,"S02/S06: выбор и создание тегов, показ в S01; фильтра/группировки нет"
-Напоминания,уведомления,should,yes,no,WorkManager — позже
-Контекстное меню задачи (edit/delete/duplicate/move),список,should,yes,partial,S08: Edit/Delete есть; Duplicate/Move нет
-Виджет на домашний экран,платформа,could,yes,no,
-Аналитика и графики прогресса,аналитика,could,yes,no,
+Теги и группировка задач,теги,should,yes,yes,"S02/S06: выбор/создание тегов; S01: multi-select фильтр по тегам (OR) и группировка «По тегам»"
+Напоминания,уведомления,should,yes,yes,"S02/S06: чекбокс + время; AlarmManager/ReminderReceiver/BootReceiver; habits/dailies — ежедневно, todo — один раз"
+Контекстное меню задачи (edit/delete/duplicate/move),список,should,yes,yes,"S08: ⋮ → Edit / Duplicate / Move / Delete; Move сбрасывает тип-специфичные поля"
+Виджет на домашний экран,платформа,could,yes,yes,"TodayWidgetProvider: уровень/XP/золото, сводка на сегодня, лучшая серия; обновление по тапу"
+Аналитика и графики прогресса,аналитика,could,yes,yes,"S09: 30 дней из task_logs, график за 14 дней, сводка, топ серий, задачи по типам"
 Тёмная/светлая тема,оформление,could,yes,yes,HabitTrackerTheme (light/dark)
 RPG-аватары питомцы снаряжение классы,геймификация,skip,yes,skip,их собственный арт и контент
 Сезонные события и награды,контент,skip,yes,skip,их контент

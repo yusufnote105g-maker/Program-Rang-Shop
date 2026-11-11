@@ -89,4 +89,70 @@
     <string name="task_deleted">Задача удалена</string>
     <string name="delete_failed">Не удалось удалить. Попробуйте ещё раз.</string>
     <string name="cancel">Отмена</string>
+
+    <!-- S08: дублирование и перенос -->
+    <string name="duplicate">Дублировать</string>
+    <string name="duplicate_task_a11y">Дублировать задачу: %1$s</string>
+    <string name="task_duplicated">Задача скопирована</string>
+    <string name="move">Переместить</string>
+    <string name="move_task_a11y">Переместить задачу: %1$s</string>
+    <string name="move_task_title">Куда переместить?</string>
+    <string name="move_task_body">«%1$s» сменит тип. Счётчики, серия и отметки сбросятся — история останется в аналитике.</string>
+    <string name="move_to_habit">В привычки</string>
+    <string name="move_to_daily">В ежедневные</string>
+    <string name="move_to_todo">В разовые</string>
+    <string name="move_task_confirm">Переместить</string>
+    <string name="task_moved">Задача перемещена</string>
+    <string name="move_failed">Не удалось переместить. Попробуйте ещё раз.</string>
+    <string name="duplicate_failed">Не удалось скопировать. Попробуйте ещё раз.</string>
+
+    <!-- S01: фильтр и группировка по тегам -->
+    <string name="filter_by_tag">Фильтр по тегам</string>
+    <string name="filter_all">Все</string>
+    <string name="group_by_tag">По тегам</string>
+    <string name="group_untagged">Без тега</string>
+    <string name="group_count">%1$d</string>
+    <string name="filter_empty_title">Ничего не нашлось</string>
+    <string name="filter_empty_body">Снимите фильтр по тегам или добавьте тег задаче.</string>
+    <string name="filter_reset">Сбросить фильтр</string>
+    <string name="filter_results_a11y">Показано задач: %1$d</string>
+
+    <!-- S02/S06: напоминания -->
+    <string name="field_reminder">Напоминание</string>
+    <string name="reminder_off">Выключено</string>
+    <string name="reminder_on">Каждый день в %1$s</string>
+    <string name="reminder_todo_on">Один раз в %1$s</string>
+    <string name="reminder_pick_time">Время напоминания</string>
+    <string name="reminder_permission_hint">Разрешите уведомления, иначе напоминание не покажется.</string>
+    <string name="reminder_channel_name">Напоминания о задачах</string>
+    <string name="reminder_channel_description">Уведомления о задачах с включённым напоминанием</string>
+    <string name="reminder_notification_body">Пора заняться задачей.</string>
+
+    <!-- Аналитика -->
+    <string name="analytics_title">Аналитика</string>
+    <string name="analytics_open">Открыть аналитику</string>
+    <string name="analytics_range">Последние %1$d дней</string>
+    <string name="analytics_completions">Отметок</string>
+    <string name="analytics_misses">Пропусков</string>
+    <string name="analytics_xp">Опыт</string>
+    <string name="analytics_gold">Золото</string>
+    <string name="analytics_chart_title">Активность по дням</string>
+    <string name="analytics_chart_a11y">Отметки за последние %1$d дней: %2$s</string>
+    <string name="analytics_streaks_title">Лучшие серии</string>
+    <string name="analytics_streak_item">%1$s — сейчас %2$d, рекорд %3$d</string>
+    <string name="analytics_types_title">Задачи по типам</string>
+    <string name="analytics_type_item">%1$s: %2$d, закрыто %3$d</string>
+    <string name="analytics_empty_title">Пока нет истории</string>
+    <string name="analytics_empty_body">Отметьте первую задачу — здесь появятся графики и серии.</string>
+    <string name="analytics_empty_cta">К задачам</string>
+    <string name="analytics_no_streaks">Серий пока нет — закройте ежедневную задачу.</string>
+
+    <!-- Виджет -->
+    <string name="widget_title">Мой трекер</string>
+    <string name="widget_description">Уровень, золото и сводка задач на сегодня.</string>
+    <string name="widget_stats">Ур. %1$d · %2$d/%3$d XP · %4$d з.</string>
+    <string name="widget_today">Привычки: %1$d\nЕжедневные: %2$d из %3$d\nРазовые: %4$d</string>
+    <string name="widget_streak">Серия: %1$d — %2$s</string>
+    <string name="widget_streak_empty">Серий пока нет</string>
+    <string name="widget_refresh">Обновить</string>
 </resources>

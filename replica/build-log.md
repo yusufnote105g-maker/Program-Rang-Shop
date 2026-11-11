@@ -11,13 +11,18 @@
 | S02 теги | 2026-11-11 | done | Чипы существующих тегов + новый тег; лимит 8, длина 24, сравнение без учёта регистра; `tags`/`task_tags`, показ в S01. |
 | S04 строка привычки | 2026-11-11 | done | Бейджи счётчиков «+N / −M» (`CounterBadge`) рядом с кнопками; при нуле не занимают места. Меню «⋮» и теги в строке. |
 | S06 редактирование | 2026-11-11 | done | Тап по строке или «⋮» → Edit; загрузка из Room, поля S02, тип read-only; удаление с подтверждением. |
-| S08 меню и удаление | 2026-11-11 | done | «⋮» → Edit/Delete; confirm-dialog с фокусом на «Отмена»; каскад `task_logs`/`task_tags`. Duplicate/Move не сделаны — should-фича остаётся partial. |
+| S08 меню и удаление | 2026-11-11 | done | «⋮» → Edit/Duplicate/Move/Delete; confirm-dialog с фокусом на «Отмена»; каскад `task_logs`/`task_tags`. Duplicate копирует теги/напоминание и сбрасывает прогресс; Move меняет тип, сбрасывает тип-специфичные поля и сохраняет историю. |
+| S01 фильтр и группировка | 2026-11-11 | done | Multi-select чипы тегов над списком (OR-семантика), переключатель «По тегам»; задача с несколькими тегами видна в каждой группе, «Без тега» — последняя; пустой результат фильтра объясняется и сбрасывается. |
+| Напоминания | 2026-11-11 | done | Чекбокс + time picker в S02/S06; `AlarmManager` + `ReminderReceiver` + `BootReceiver`; habits/dailies — ежедневно, todo — один раз; канал уведомлений и запрос `POST_NOTIFICATIONS` на Android 13+. |
+| S09 аналитика | 2026-11-11 | done | Отдельный экран: 30 дней из `task_logs`, график за 14 дней, сводка отметок/пропусков/XP/золота, топ серий и распределение по типам. |
+| Домашний виджет | 2026-11-11 | done | `TodayWidgetProvider` на `RemoteViews`: уровень/XP/золото, сводка на сегодня, лучшая серия; обновление по тапу и после изменений в приложении. |
 | S05 фидбек | 2026-11-11 | partial | Snackbar наград + сообщение о пропущенных днях. Отдельного попапа с анимацией и модала level-up всё ещё нет. |
 | F06 ежедневный сброс | 2026-11-11 | done | `CronEngine` (календарь) + `DailyResetWorker` (WorkManager) + догон при старте. Идемпотентно по `last_cron_day`. |
 | День и часовой пояс | 2026-11-11 | done | Ключ дня считается в зоне пользователя и с учётом `day_start_minutes`; `observeToday()` питает UI. |
 | Тестовый прогон F01–F06 | 2026-11-11 | done | 74 кейса в `replica/test-plan.md`; 30 багов найдено и исправлено (S1 — 2, S2 — 10, S3 — 14, S4 — 4) в `fd0887b`. Отчёт: `replica/bugs.md`. |
-| Автотесты | 2026-11-11 | done | 20 JVM-тестов (`CronEngineTest`, `RewardEngineTest`, `TagRulesTest`) + 20 androidTest (`TaskRepositoryTest`, Room in-memory). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
-| Parity-дифф | 2026-11-11 | done | feature score 88.2/100, must-have 12/12, feature-гейт пройден. Layout N/A: нет скриншотов оригинала/клона и эмулятора; релиз не проверен сборкой. Отчёт: `replica/parity.md`. |
+| Автотесты | 2026-11-11 | done | 33 JVM-теста (`CronEngineTest`, `RewardEngineTest`, `TagRulesTest`, `ReminderTimeTest`, `TaskFiltersTest`, `AnalyticsSeriesTest`) + 27 androidTest (`TaskRepositoryTest`, Room in-memory, включая duplicate/move/reminders/analytics/widget). В этом окружении не запускались: нет JDK/SDK/эмулятора. |
+| Parity-дифф | 2026-11-11 | done | feature score 100.0/100, must-have 12/12, should 6/6, could 3/3, feature-гейт пройден. Layout N/A: нет скриншотов оригинала/клона и эмулятора; релиз локально не проверен сборкой. Отчёт: `replica/parity.md`. |
+| Финальный ZIP v2 | 2026-11-11 | done | Собран проект для сборки APK в GitHub Actions; локальная сборка на телефоне остановлена пользователем из-за медленного интернета. |
 
 ## Что сложнее, чем казалось
 
@@ -44,12 +49,13 @@
   клампинг HP, идемпотентность повторного запуска.
 - Статические проверки: XML/TOML валидны, все `R.string` и `Dimens` существуют,
   неиспользуемых импортов нет, скобки сбалансированы.
-- Написаны 20 JVM- и 20 androidTest-тестов. Запуск там, где есть SDK:
+- Написаны 33 JVM- и 27 androidTest-тестов. Запуск там, где есть SDK:
   `./gradlew :app:testDebugUnitTest` и `./gradlew :app:connectedDebugAndroidTest`.
 
 ## Следующие шаги
 
-1. S08: Duplicate/Move — контекстное меню станет полным.
-2. Теги: фильтр/группировка в S01.
-3. S05: модал level-up и анимация награды.
-4. Напоминания (`ReminderWorker`) — по образцу `DailyResetWorker`.
+1. Собрать APK в Android Studio/`./gradlew :app:assembleDebug`.
+2. Прогнать `testDebugUnitTest` и `connectedDebugAndroidTest` на устройстве/эмуляторе.
+3. Снять скриншоты 390x844 для layout-диффа (S01/S02/S04/S06/S07/S08/S09).
+4. Проверить на устройстве напоминания (Android 13+, перезагрузка), виджет и Move.
+5. Полировка: модал level-up и анимация награды вместо snackbar.

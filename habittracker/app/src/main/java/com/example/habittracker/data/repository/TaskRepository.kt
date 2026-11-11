@@ -2,6 +2,7 @@ package com.example.habittracker.data.repository
 
 import androidx.room.withTransaction
 import com.example.habittracker.data.local.AppDatabase
+import com.example.habittracker.data.local.dao.DailyLogRow
 import com.example.habittracker.data.local.dao.TagDao
 import com.example.habittracker.data.local.dao.TaskDao
 import com.example.habittracker.data.local.dao.TaskLogDao
@@ -14,19 +15,31 @@ import com.example.habittracker.data.local.entity.UserEntity
 import com.example.habittracker.data.local.toDomain
 import com.example.habittracker.data.local.toSchedule
 import com.example.habittracker.data.local.toStats
+import com.example.habittracker.domain.analytics.buildDailySeries
 import com.example.habittracker.domain.cron.CronEngine
+import com.example.habittracker.domain.model.AnalyticsData
+import com.example.habittracker.domain.model.DailyActivity
 import com.example.habittracker.domain.model.DailyResetReport
 import com.example.habittracker.domain.model.Difficulty
+import com.example.habittracker.domain.model.DuplicatedTask
+import com.example.habittracker.domain.model.Frequency
+import com.example.habittracker.domain.model.ReminderFiring
 import com.example.habittracker.domain.model.RewardResult
+import com.example.habittracker.domain.model.StreakItem
 import com.example.habittracker.domain.model.Tag
 import com.example.habittracker.domain.model.Task
 import com.example.habittracker.domain.model.TaskType
+import com.example.habittracker.domain.model.TaskTypeCount
 import com.example.habittracker.domain.model.UserStats
+import com.example.habittracker.domain.model.WidgetSnapshot
+import com.example.habittracker.domain.reminder.ReminderTime
 import com.example.habittracker.domain.reward.RewardEngine
 import com.example.habittracker.domain.tags.TagRules
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
@@ -110,6 +123,8 @@ class TaskRepository @Inject constructor(
         up: Boolean,
         down: Boolean,
         tags: List<String> = emptyList(),
+        reminderEnabled: Boolean = false,
+        reminderAt: Long? = null,
     ): String = db.withTransaction {
         val user = requireUser()
         val now = clock.millis()
@@ -125,6 +140,8 @@ class TaskRepository @Inject constructor(
                 up = up,
                 down = down,
                 startDate = dayKey(user, clock.instant()).toString(),
+                reminderEnabled = reminderEnabled && reminderAt != null,
+                reminderAt = reminderAt.takeIf { reminderEnabled },
                 position = taskDao.nextPosition(user.id),
                 createdAt = now,
                 updatedAt = now,
@@ -152,19 +169,118 @@ class TaskRepository @Inject constructor(
         notes: String,
         difficulty: Difficulty,
         tags: List<String>,
+        reminderEnabled: Boolean? = null,
+        reminderAt: Long? = null,
     ): Boolean = db.withTransaction {
         val task = taskDao.getById(taskId) ?: return@withTransaction false
+        val enabled = reminderEnabled ?: task.reminderEnabled
         taskDao.update(
             task.copy(
                 text = text.trim(),
                 notes = notes.trim(),
                 difficulty = difficulty.name,
+                reminderEnabled = enabled,
+                reminderAt = when {
+                    !enabled -> null
+                    reminderAt != null -> reminderAt
+                    else -> task.reminderAt
+                },
                 updatedAt = clock.millis(),
             ),
         )
         replaceTags(task.userId, taskId, tags)
         true
     }
+
+    /**
+     * S08: копия задачи без истории. Счётчики, серия и закрытие сбрасываются,
+     * теги и напоминание переносятся. Напоминание пересчитывается на будущее,
+     * чтобы копия не выстрелила уведомлением сразу после создания.
+     */
+    suspend fun duplicateTask(taskId: String): DuplicatedTask? = db.withTransaction {
+        val source = taskDao.getById(taskId) ?: return@withTransaction null
+        val user = requireUser()
+        val now = clock.millis()
+        val newId = UUID.randomUUID().toString()
+        val nextReminder = source.reminderAt
+            ?.takeIf { source.reminderEnabled }
+            ?.let { ReminderTime.nextAfter(it, now, zoneOf(user)) }
+        taskDao.insert(
+            source.copy(
+                id = newId,
+                counterUp = 0,
+                counterDown = 0,
+                streak = 0,
+                bestStreak = 0,
+                lastCompletedDay = null,
+                completed = false,
+                completedAt = null,
+                reminderEnabled = nextReminder != null,
+                reminderAt = nextReminder,
+                position = taskDao.nextPosition(source.userId),
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        tagDao.getTagsForTask(taskId).forEach { tag ->
+            tagDao.insertTaskTag(TaskTagEntity(taskId = newId, tagId = tag.id))
+        }
+        DuplicatedTask(id = newId, text = source.text, reminderAt = nextReminder)
+    }
+
+    /**
+     * S08: перенос между Habits/Dailies/To-Dos. Тип-специфичные поля
+     * сбрасываются осознанно: иначе счётчики привычки стали бы streak'ом
+     * ежедневной, а закрытый to-do остался бы закрытым после переноса.
+     * История task_logs сохраняется.
+     */
+    suspend fun moveTask(taskId: String, newType: TaskType): Boolean = db.withTransaction {
+        val task = taskDao.getById(taskId) ?: return@withTransaction false
+        if (task.type == newType.name) return@withTransaction true
+        val user = requireUser()
+        val now = clock.millis()
+        val zone = zoneOf(user)
+        val nextReminder = task.reminderAt
+            ?.takeIf { task.reminderEnabled }
+            ?.let { ReminderTime.nextAfter(it, now, zone) }
+        taskDao.update(
+            task.copy(
+                type = newType.name,
+                up = true,
+                down = newType == TaskType.HABIT,
+                counterUp = 0,
+                counterDown = 0,
+                streak = 0,
+                bestStreak = 0,
+                frequency = Frequency.DAILY.name,
+                everyX = 1,
+                repeatDays = "",
+                startDate = dayKey(user, clock.instant()).toString(),
+                lastCompletedDay = null,
+                dueDate = null,
+                completed = false,
+                completedAt = null,
+                reminderEnabled = nextReminder != null,
+                reminderAt = nextReminder,
+                updatedAt = now,
+            ),
+        )
+        true
+    }
+
+    /** Включает/выключает напоминание без смены остальных полей. */
+    suspend fun setReminder(taskId: String, enabled: Boolean, reminderAt: Long?): Boolean =
+        db.withTransaction {
+            val task = taskDao.getById(taskId) ?: return@withTransaction false
+            taskDao.update(
+                task.copy(
+                    reminderEnabled = enabled && reminderAt != null,
+                    reminderAt = reminderAt.takeIf { enabled },
+                    updatedAt = clock.millis(),
+                ),
+            )
+            true
+        }
 
     /**
      * Положительная отметка. Возвращает null, если действие недопустимо:
@@ -295,7 +411,15 @@ class TaskRepository @Inject constructor(
         userDao.upsert(
             user.copy(level = applied.level, xp = applied.xp, gold = user.gold + gold, updatedAt = now),
         )
-        taskDao.update(task.copy(completed = true, completedAt = now, updatedAt = now))
+        taskDao.update(
+            task.copy(
+                completed = true,
+                completedAt = now,
+                reminderEnabled = false,
+                reminderAt = null,
+                updatedAt = now,
+            ),
+        )
         taskLogDao.insert(
             TaskLogEntity(
                 id = UUID.randomUUID().toString(),
@@ -314,6 +438,125 @@ class TaskRepository @Inject constructor(
 
     suspend fun deleteTask(taskId: String) = db.withTransaction {
         taskDao.deleteById(taskId)
+    }
+
+    /** Все задачи с напоминанием — для BootReceiver. */
+    suspend fun getReminderTasks(): List<Task> =
+        taskDao.getEnabledReminders().map { it.toDomain() }
+
+    /**
+     * Вызывается из ReminderReceiver. Для habits/dailies переносит напоминание
+     * на следующий день, для to-do выключает после единственного срабатывания.
+     */
+    suspend fun onReminderFired(taskId: String): ReminderFiring? = db.withTransaction {
+        val task = taskDao.getById(taskId) ?: return@withTransaction null
+        if (!task.reminderEnabled) return@withTransaction null
+        val user = requireUser()
+        val now = clock.millis()
+        if (task.type == TaskType.TODO.name && task.completed) {
+            taskDao.update(task.copy(reminderEnabled = false, reminderAt = null, updatedAt = now))
+            return@withTransaction null
+        }
+        val next = if (task.type == TaskType.TODO.name) {
+            null
+        } else {
+            ReminderTime.nextAfter(
+                previousMillis = task.reminderAt ?: now,
+                nowMillis = now,
+                zone = zoneOf(user),
+            )
+        }
+        taskDao.update(
+            task.copy(
+                reminderEnabled = next != null,
+                reminderAt = next,
+                updatedAt = now,
+            ),
+        )
+        ReminderFiring(
+            taskId = task.id,
+            text = task.text,
+            notes = task.notes,
+            nextTriggerAt = next,
+        )
+    }
+
+    /**
+     * Аналитика за [rangeDays] локальных дней. Считается только по task_logs,
+     * поэтому удаление задачи не переписывает прошлое — но её логи уходят
+     * каскадом, и это честно отражено в docs.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeAnalytics(rangeDays: Int = 30): Flow<AnalyticsData> {
+        val dailyFlow = observeToday().flatMapLatest { todayKey ->
+            val today = parseDay(todayKey) ?: LocalDate.now()
+            val from = today.minusDays((rangeDays - 1).coerceAtLeast(0).toLong())
+            taskLogDao.observeDaily(from.toString(), today.toString())
+        }
+        return combine(
+            observeToday(),
+            userDao.observeUser(),
+            dailyFlow,
+            taskDao.observeTypeCounts(),
+            taskDao.observeTopStreaks(),
+        ) { todayKey, user, rows, counts, streaks ->
+            val today = parseDay(todayKey) ?: LocalDate.now()
+            val byDay = rows.associate { row ->
+                val day = parseDay(row.day) ?: today
+                day to DailyActivity(
+                    day = day,
+                    completions = row.completions,
+                    misses = row.misses,
+                    xpEarned = row.xpEarned,
+                    goldEarned = row.goldEarned,
+                )
+            }
+            AnalyticsData(
+                rangeDays = rangeDays,
+                daily = buildDailySeries(today, rangeDays, byDay),
+                totalCompletions = rows.sumOf(DailyLogRow::completions),
+                totalMisses = rows.sumOf(DailyLogRow::misses),
+                xpEarned = rows.sumOf(DailyLogRow::xpEarned),
+                goldEarned = rows.sumOf(DailyLogRow::goldEarned),
+                counts = counts.mapNotNull { row ->
+                    TaskType.entries.firstOrNull { it.name == row.type }
+                        ?.let { TaskTypeCount(it, row.total, row.completed) }
+                },
+                topStreaks = streaks.map { row ->
+                    StreakItem(
+                        id = row.id,
+                        text = row.text,
+                        current = row.streak,
+                        best = row.bestStreak,
+                    )
+                },
+                level = user?.level ?: 1,
+                gold = user?.gold ?: 0,
+            )
+        }
+    }
+
+    /** Снимок для домашнего виджета: без Flow, один раз при обновлении. */
+    suspend fun widgetSnapshot(): WidgetSnapshot {
+        val user = requireUser()
+        val today = dayKey(user, clock.instant())
+        val tasks = taskDao.getAllActive()
+        val dailies = tasks.filter { it.type == TaskType.DAILY.name }
+        val best = dailies.maxByOrNull { it.streak }
+        return WidgetSnapshot(
+            level = user.level,
+            xp = user.xp,
+            xpToNext = RewardEngine.xpToNext(user.level),
+            hp = user.hp,
+            maxHp = user.maxHp,
+            gold = user.gold,
+            habits = tasks.count { it.type == TaskType.HABIT.name },
+            dailiesDue = dailies.count { CronEngine.isDue(it.toSchedule(), today) },
+            dailiesDone = dailies.count { it.lastCompletedDay == today.toString() },
+            todosOpen = tasks.count { it.type == TaskType.TODO.name && !it.completed },
+            bestStreak = best?.streak ?: 0,
+            bestStreakText = best?.text,
+        )
     }
 
     /** Полностью заменяет набор тегов задачи. Новые теги создаются на лету. */

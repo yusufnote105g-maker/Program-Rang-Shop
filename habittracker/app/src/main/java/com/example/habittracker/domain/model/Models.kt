@@ -45,6 +45,9 @@ data class Task(
     val completed: Boolean = false,
     val position: Int = 0,
     val archived: Boolean = false,
+    /** Напоминание включено; [reminderAt] — ближайший запуск в epoch millis. */
+    val reminderEnabled: Boolean = false,
+    val reminderAt: Long? = null,
     val tags: List<Tag> = emptyList(),
 )
 

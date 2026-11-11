@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Значения из replica/design/tokens.json -> colorDark. -->
+    <color name="widget_bg">#171A20</color>
+    <color name="widget_text">#ECEEF2</color>
+    <color name="widget_text_muted">#A2AAB8</color>
+    <color name="widget_accent">#AEB8FF</color>
+    <color name="widget_gold">#E0C060</color>
+</resources>

@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +55,8 @@ fun TaskRow(
     onComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onMove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val editLabel = stringResource(R.string.edit_task)
@@ -117,16 +121,24 @@ fun TaskRow(
                     TaskLabel(task = task, modifier = Modifier.weight(1f))
                 }
             }
-            TaskActionsMenu(task = task, onEdit = onEdit, onDelete = onDelete)
+            TaskActionsMenu(
+                task = task,
+                onEdit = onEdit,
+                onDuplicate = onDuplicate,
+                onMove = onMove,
+                onDelete = onDelete,
+            )
         }
     }
 }
 
-/** S08: «⋮» → Edit / Delete. Duplicate и Move остаются на следующий срез. */
+/** S08: «⋮» → Edit / Duplicate / Move / Delete. */
 @Composable
 private fun TaskActionsMenu(
     task: Task,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
+    onMove: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -146,6 +158,26 @@ private fun TaskActionsMenu(
                 },
                 leadingIcon = {
                     Icon(imageVector = Icons.Default.Edit, contentDescription = null)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.duplicate)) },
+                onClick = {
+                    open = false
+                    onDuplicate()
+                },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.move)) },
+                onClick = {
+                    open = false
+                    onMove()
+                },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Default.SwapHoriz, contentDescription = null)
                 },
             )
             DropdownMenuItem(

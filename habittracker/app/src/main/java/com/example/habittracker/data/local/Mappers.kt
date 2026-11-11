@@ -39,6 +39,8 @@ fun TaskEntity.toDomain(today: LocalDate? = null, tags: List<Tag> = emptyList())
     completed = completed,
     position = position,
     archived = archived,
+    reminderEnabled = reminderEnabled,
+    reminderAt = reminderAt,
     tags = tags,
 )
 

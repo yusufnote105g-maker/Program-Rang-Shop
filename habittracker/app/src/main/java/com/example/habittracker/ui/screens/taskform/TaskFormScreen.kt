@@ -1,15 +1,23 @@
 package com.example.habittracker.ui.screens.taskform
 
+import android.Manifest
+import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -18,7 +26,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -45,14 +55,18 @@ import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.habittracker.R
 import com.example.habittracker.domain.model.Difficulty
 import com.example.habittracker.domain.model.Tag
 import com.example.habittracker.domain.model.TaskType
+import com.example.habittracker.domain.reminder.ReminderTime
 import com.example.habittracker.domain.tags.TagRules
 import com.example.habittracker.ui.components.ConfirmDeleteDialog
 import com.example.habittracker.ui.components.TagDot
@@ -233,6 +247,13 @@ private fun TaskFormContent(
             }
         }
 
+        ReminderSection(
+            state = state,
+            onEnabledChange = viewModel::setReminderEnabled,
+            onTimeChange = viewModel::setReminderTime,
+            enabled = !busy,
+        )
+
         SectionLabel(stringResource(R.string.field_tags))
         Text(
             text = stringResource(R.string.tags_hint),
@@ -280,6 +301,99 @@ private fun TaskFormContent(
         )
     }
 }
+
+/** S02/S06: напоминание с временем и запросом POST_NOTIFICATIONS на Android 13+. */
+@Composable
+private fun ReminderSection(
+    state: TaskFormUiState,
+    onEnabledChange: (Boolean) -> Unit,
+    onTimeChange: (Int, Int) -> Unit,
+    enabled: Boolean,
+) {
+    val context = LocalContext.current
+    var notificationsGranted by remember {
+        mutableStateOf(hasNotificationPermission(context))
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> notificationsGranted = granted }
+
+    fun setEnabled(checked: Boolean) {
+        onEnabledChange(checked)
+        if (checked && !hasNotificationPermission(context)) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    SectionLabel(stringResource(R.string.field_reminder))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = state.reminderEnabled,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = { checked -> setEnabled(checked) },
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = state.reminderEnabled,
+            onCheckedChange = null,
+            enabled = enabled,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (state.reminderEnabled) {
+                    val time = ReminderTime.format(state.reminderHour, state.reminderMinute)
+                    if (state.type == TaskType.TODO) {
+                        stringResource(R.string.reminder_todo_on, time)
+                    } else {
+                        stringResource(R.string.reminder_on, time)
+                    }
+                } else {
+                    stringResource(R.string.reminder_off)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (state.reminderEnabled) {
+            TextButton(
+                onClick = {
+                    TimePickerDialog(
+                        context,
+                        { _, hour, minute -> onTimeChange(hour, minute) },
+                        state.reminderHour,
+                        state.reminderMinute,
+                        true,
+                    ).show()
+                },
+                enabled = enabled,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Notifications,
+                    contentDescription = stringResource(R.string.reminder_pick_time),
+                )
+                Text(ReminderTime.format(state.reminderHour, state.reminderMinute))
+            }
+        }
+    }
+    if (state.reminderEnabled && !notificationsGranted) {
+        Text(
+            text = stringResource(R.string.reminder_permission_hint),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+private fun hasNotificationPermission(context: android.content.Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

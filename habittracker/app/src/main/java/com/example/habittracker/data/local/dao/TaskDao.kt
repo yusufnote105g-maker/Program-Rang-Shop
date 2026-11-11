@@ -13,6 +13,34 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE type = :type AND archived = 0 ORDER BY position, created_at")
     fun observeByType(type: String): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE archived = 0 ORDER BY position, created_at")
+    suspend fun getAllActive(): List<TaskEntity>
+
+    /** Все задачи с включённым напоминанием — для восстановления после перезагрузки. */
+    @Query("SELECT * FROM tasks WHERE archived = 0 AND reminder_enabled = 1")
+    suspend fun getEnabledReminders(): List<TaskEntity>
+
+    @Query(
+        """
+        SELECT type, COUNT(*) AS total,
+               SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completed
+        FROM tasks WHERE archived = 0
+        GROUP BY type
+        """,
+    )
+    fun observeTypeCounts(): Flow<List<TaskTypeCountRow>>
+
+    @Query(
+        """
+        SELECT id, text, streak, best_streak AS best_streak
+        FROM tasks
+        WHERE archived = 0 AND type = 'DAILY'
+        ORDER BY best_streak DESC, streak DESC
+        LIMIT 5
+        """,
+    )
+    fun observeTopStreaks(): Flow<List<TaskStreakRow>>
+
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getById(id: String): TaskEntity?
 
