@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Habit Tracker</string>
+
+    <!-- S01: список задач -->
+    <string name="tab_habits">Привычки</string>
+    <string name="tab_dailies">Ежедневные</string>
+    <string name="tab_todos">Разовые</string>
+    <string name="add_task">Добавить задачу</string>
+    <string name="empty_habits_title">Пока нет привычек</string>
+    <string name="empty_habits_body">Добавьте первую привычку и отмечайте её каждый день.</string>
+    <string name="empty_cta">Добавить привычку</string>
+    <string name="mark_done_plus">Отметить плюсом: %1$s</string>
+    <string name="mark_done_minus">Отметить минусом: %1$s</string>
+    <string name="streak_label">Серия: %1$d</string>
+    <string name="counter_up_value">+%1$d</string>
+    <string name="counter_down_value">−%1$d</string>
+    <string name="counter_up_a11y">Отмечено плюсом: %1$d</string>
+    <string name="counter_down_a11y">Отмечено минусом: %1$d</string>
+    <string name="stats_a11y">Уровень %1$d, опыт %2$d из %3$d, здоровье %4$d из %5$d, золото %6$d</string>
+    <string name="reward_xp">+%1$d опыта</string>
+    <string name="reward_level_up">Новый уровень: %1$d!</string>
+    <string name="reward_penalty">−%1$d здоровья</string>
+    <string name="cron_missed">Пропущено ежедневных: %1$d, −%2$d здоровья</string>
+
+    <!-- S02: создание привычки -->
+    <string name="new_task_title">Новая задача</string>
+    <string name="field_name">Название</string>
+    <string name="field_name_error">Введите название</string>
+    <string name="field_notes">Заметки</string>
+    <string name="field_type">Тип</string>
+    <string name="field_difficulty">Сложность</string>
+    <string name="type_habit">Привычка</string>
+    <string name="type_daily">Ежедневная</string>
+    <string name="type_todo">Разовая</string>
+    <string name="difficulty_trivial">Тривиально</string>
+    <string name="difficulty_easy">Легко</string>
+    <string name="difficulty_medium">Средне</string>
+    <string name="difficulty_hard">Сложно</string>
+    <string name="save">Сохранить</string>
+    <string name="back">Назад</string>
+</resources>
