@@ -43,23 +43,36 @@ fun AvatarHeader(stats: UserStats?, modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "Ур. ${stats.level}",
+                    text = stringResource(R.string.level_short, stats.level),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "${stats.gold} з.",
+                    text = stringResource(R.string.gold_short, stats.gold),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.extra.gold,
                 )
             }
             Spacer(Modifier.height(Dimens.sm))
+            // Подпись обязательна: прогресс нельзя передавать только цветом полосы.
+            Text(
+                text = stringResource(R.string.xp_label, stats.xp, stats.xpToNext),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(Dimens.xs))
             LinearProgressIndicator(
                 progress = { stats.xp.toFloat() / stats.xpToNext.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(Dimens.sm))
+            Text(
+                text = stringResource(R.string.hp_label, stats.hp, stats.maxHp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(Dimens.xs))
             LinearProgressIndicator(
                 progress = { stats.hp.toFloat() / stats.maxHp.coerceAtLeast(1) },
                 modifier = Modifier.fillMaxWidth(),

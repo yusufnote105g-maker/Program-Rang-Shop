@@ -33,6 +33,8 @@ data class Task(
     val repeatDays: List<Int> = emptyList(),
     /** Для daily: последний локальный день, когда задача была закрыта. */
     val lastCompletedDay: String? = null,
+    /** Для daily: нужна ли задача именно сегодня (выходной по расписанию). */
+    val dueToday: Boolean = true,
     val completed: Boolean = false,
     val position: Int = 0,
     val archived: Boolean = false,

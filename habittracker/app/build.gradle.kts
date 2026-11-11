@@ -83,4 +83,13 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
 
     implementation(libs.kotlinx.coroutines.android)
+
+    // Юнит-тесты (JVM) и инструментальные тесты (Room in-memory).
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

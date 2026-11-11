@@ -8,6 +8,7 @@ import com.example.habittracker.domain.model.Task
 import com.example.habittracker.domain.model.TaskType
 import com.example.habittracker.domain.model.UserStats
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,8 @@ data class TasksUiState(
 sealed interface TasksEvent {
     data class Reward(val result: RewardResult) : TasksEvent
     data class DailyReset(val missed: Int, val hpLost: Int) : TasksEvent
+    /** Отметка не применилась: например, задача уже удалена или БД недоступна. */
+    data object ActionFailed : TasksEvent
 }
 
 @HiltViewModel
@@ -54,12 +57,15 @@ class TasksViewModel @Inject constructor(
             tasksFlow,
             repository.observeToday(),
         ) { tab, stats, tasks, today ->
+            // Сразу после переключения вкладки flatMapLatest ещё не успел отдать
+            // новый список; не показываем чужие задачи под новым табом.
+            val belongsToTab = tasks.all { it.type == tab }
             TasksUiState(
                 selectedTab = tab,
-                tasks = tasks,
+                tasks = if (belongsToTab) tasks else emptyList(),
                 stats = stats,
                 today = today,
-                loading = false,
+                loading = !belongsToTab,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -69,12 +75,18 @@ class TasksViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repository.ensureUser()
-            // Догоняем пропущенные дни, если приложение открыли после границы дня.
-            repository.runDailyCron()?.let { report ->
-                if (report.missedDailies > 0) {
-                    events.send(TasksEvent.DailyReset(report.missedDailies, report.hpLost))
+            try {
+                repository.ensureUser()
+                // Догоняем пропущенные дни, если приложение открыли после границы дня.
+                repository.runDailyCron()?.let { report ->
+                    if (report.missedDailies > 0) {
+                        events.send(TasksEvent.DailyReset(report.missedDailies, report.hpLost))
+                    }
                 }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                // Список всё равно покажем: сброс повторится при следующем старте или воркером.
             }
         }
     }
@@ -90,12 +102,27 @@ class TasksViewModel @Inject constructor(
     fun completeTodo(taskId: String) = runReward { repository.completeTodo(taskId) }
 
     fun deleteTask(taskId: String) {
-        viewModelScope.launch { repository.deleteTask(taskId) }
+        viewModelScope.launch {
+            try {
+                repository.deleteTask(taskId)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                events.send(TasksEvent.ActionFailed)
+            }
+        }
     }
 
     private fun runReward(block: suspend () -> RewardResult?) {
         viewModelScope.launch {
-            block()?.let { events.send(TasksEvent.Reward(it)) }
+            try {
+                block()?.let { events.send(TasksEvent.Reward(it)) }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                // Ошибку БД не роняем в UI-поток: показываем snackbar.
+                events.send(TasksEvent.ActionFailed)
+            }
         }
     }
 }

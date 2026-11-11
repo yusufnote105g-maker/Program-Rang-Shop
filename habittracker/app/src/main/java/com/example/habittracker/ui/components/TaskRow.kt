@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.habittracker.R
@@ -65,12 +67,29 @@ fun TaskRow(
 
                 TaskType.DAILY -> {
                     val doneToday = task.lastCompletedDay == today
-                    Checkbox(checked = doneToday, onCheckedChange = { if (it) onPlus() })
-                    TaskLabel(task = task, modifier = Modifier.weight(1f), showStreak = true)
+                    val a11y = stringResource(R.string.mark_done_plus, task.text)
+                    Checkbox(
+                        checked = doneToday,
+                        enabled = task.dueToday && !doneToday,
+                        onCheckedChange = { if (it) onPlus() },
+                        modifier = Modifier.semantics { contentDescription = a11y },
+                    )
+                    TaskLabel(
+                        task = task,
+                        modifier = Modifier.weight(1f),
+                        showStreak = true,
+                        notDue = !task.dueToday,
+                    )
                 }
 
                 TaskType.TODO -> {
-                    Checkbox(checked = task.completed, onCheckedChange = { if (it) onComplete() })
+                    val a11y = stringResource(R.string.complete_todo_a11y, task.text)
+                    Checkbox(
+                        checked = task.completed,
+                        enabled = !task.completed,
+                        onCheckedChange = { if (it) onComplete() },
+                        modifier = Modifier.semantics { contentDescription = a11y },
+                    )
                     TaskLabel(task = task, modifier = Modifier.weight(1f))
                 }
             }
@@ -83,29 +102,35 @@ private fun TaskLabel(
     task: Task,
     modifier: Modifier = Modifier,
     showStreak: Boolean = false,
+    notDue: Boolean = false,
 ) {
     Column(modifier = modifier) {
         Text(
             text = task.text,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (notDue) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        if (showStreak && task.streak > 0) {
-            Text(
-                text = stringResource(R.string.streak_label, task.streak),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else if (task.notes.isNotBlank()) {
-            Text(
-                text = task.notes,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        when {
+            notDue -> SubLabel(stringResource(R.string.not_due_today))
+            showStreak && task.streak > 0 -> SubLabel(stringResource(R.string.streak_label, task.streak))
+            task.notes.isNotBlank() -> SubLabel(task.notes, maxLines = 1)
         }
     }
+}
+
+@Composable
+private fun SubLabel(text: String, maxLines: Int = 1) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

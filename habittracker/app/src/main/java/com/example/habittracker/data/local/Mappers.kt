@@ -2,6 +2,7 @@ package com.example.habittracker.data.local
 
 import com.example.habittracker.data.local.entity.TaskEntity
 import com.example.habittracker.data.local.entity.UserEntity
+import com.example.habittracker.domain.cron.CronEngine
 import com.example.habittracker.domain.cron.TaskSchedule
 import com.example.habittracker.domain.model.Difficulty
 import com.example.habittracker.domain.model.Frequency
@@ -11,7 +12,12 @@ import com.example.habittracker.domain.model.UserStats
 import com.example.habittracker.domain.reward.RewardEngine
 import java.time.LocalDate
 
-fun TaskEntity.toDomain(): Task = Task(
+/**
+ * @param today локальный день пользователя. Если передан, задача знает,
+ *   нужна ли она сегодня (`dueToday`) — это нужно для серых чекбоксов
+ *   у ежедневных с расписанием.
+ */
+fun TaskEntity.toDomain(today: LocalDate? = null): Task = Task(
     id = id,
     type = enumOrDefault(type, TaskType.HABIT),
     text = text,
@@ -26,6 +32,7 @@ fun TaskEntity.toDomain(): Task = Task(
     frequency = enumOrDefault(frequency, Frequency.DAILY),
     repeatDays = repeatDays.split(",").mapNotNull { it.trim().toIntOrNull() },
     lastCompletedDay = lastCompletedDay,
+    dueToday = today == null || CronEngine.isDue(toSchedule(), today),
     completed = completed,
     position = position,
     archived = archived,

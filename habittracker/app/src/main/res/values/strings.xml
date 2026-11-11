@@ -1,27 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Habit Tracker</string>
+    <string name="app_name">Трекер привычек</string>
 
     <!-- S01: список задач -->
     <string name="tab_habits">Привычки</string>
     <string name="tab_dailies">Ежедневные</string>
     <string name="tab_todos">Разовые</string>
     <string name="add_task">Добавить задачу</string>
+    <string name="loading_tasks">Загружаем задачи</string>
     <string name="empty_habits_title">Пока нет привычек</string>
     <string name="empty_habits_body">Добавьте первую привычку и отмечайте её каждый день.</string>
-    <string name="empty_cta">Добавить привычку</string>
+    <string name="empty_habits_cta">Добавить привычку</string>
+    <string name="empty_dailies_title">Пока нет ежедневных</string>
+    <string name="empty_dailies_body">Заведите задачу на каждый день — приложение само посчитает серию.</string>
+    <string name="empty_dailies_cta">Добавить ежедневную</string>
+    <string name="empty_todos_title">Пока нет разовых задач</string>
+    <string name="empty_todos_body">Разовые задачи закрываются один раз и дают награду.</string>
+    <string name="empty_todos_cta">Добавить задачу</string>
     <string name="mark_done_plus">Отметить плюсом: %1$s</string>
     <string name="mark_done_minus">Отметить минусом: %1$s</string>
+    <string name="complete_todo_a11y">Закрыть задачу: %1$s</string>
     <string name="streak_label">Серия: %1$d</string>
+    <string name="not_due_today">Не сегодня</string>
     <string name="counter_up_value">+%1$d</string>
     <string name="counter_down_value">−%1$d</string>
     <string name="counter_up_a11y">Отмечено плюсом: %1$d</string>
     <string name="counter_down_a11y">Отмечено минусом: %1$d</string>
     <string name="stats_a11y">Уровень %1$d, опыт %2$d из %3$d, здоровье %4$d из %5$d, золото %6$d</string>
+    <string name="level_short">Ур. %1$d</string>
+    <string name="gold_short">%1$d з.</string>
+    <string name="xp_label">Опыт %1$d / %2$d</string>
+    <string name="hp_label">Здоровье %1$d / %2$d</string>
     <string name="reward_xp">+%1$d опыта</string>
+    <string name="reward_xp_loss">−%1$d опыта</string>
     <string name="reward_level_up">Новый уровень: %1$d!</string>
     <string name="reward_penalty">−%1$d здоровья</string>
+    <string name="reward_penalty_both">−%1$d опыта, −%2$d здоровья</string>
     <string name="cron_missed">Пропущено ежедневных: %1$d, −%2$d здоровья</string>
+    <string name="cron_missed_no_hp">Пропущено ежедневных: %1$d</string>
+    <string name="action_failed">Не получилось. Попробуйте ещё раз.</string>
 
     <!-- S02: создание привычки -->
     <string name="new_task_title">Новая задача</string>
@@ -38,5 +55,6 @@
     <string name="difficulty_medium">Средне</string>
     <string name="difficulty_hard">Сложно</string>
     <string name="save">Сохранить</string>
+    <string name="save_failed">Не удалось сохранить. Попробуйте ещё раз.</string>
     <string name="back">Назад</string>
 </resources>

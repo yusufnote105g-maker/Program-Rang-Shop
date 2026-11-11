@@ -34,6 +34,7 @@ import com.example.habittracker.R
 import com.example.habittracker.domain.model.TaskType
 import com.example.habittracker.ui.components.AvatarHeader
 import com.example.habittracker.ui.components.EmptyState
+import com.example.habittracker.ui.components.TaskListSkeleton
 import com.example.habittracker.ui.components.TaskRow
 import com.example.habittracker.ui.theme.Dimens
 
@@ -41,7 +42,7 @@ import com.example.habittracker.ui.theme.Dimens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
-    onAddTask: () -> Unit,
+    onAddTask: (TaskType) -> Unit,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -55,13 +56,22 @@ fun TasksScreen(
                     val reward = event.result
                     when {
                         reward.leveledUp -> context.getString(R.string.reward_level_up, reward.newLevel)
+                        reward.hpDelta < 0 && reward.xpDelta < 0 ->
+                            context.getString(R.string.reward_penalty_both, -reward.xpDelta, -reward.hpDelta)
                         reward.hpDelta < 0 -> context.getString(R.string.reward_penalty, -reward.hpDelta)
+                        reward.xpDelta < 0 -> context.getString(R.string.reward_xp_loss, -reward.xpDelta)
                         else -> context.getString(R.string.reward_xp, reward.xpDelta)
                     }
                 }
 
                 is TasksEvent.DailyReset ->
-                    context.getString(R.string.cron_missed, event.missed, event.hpLost)
+                    if (event.hpLost > 0) {
+                        context.getString(R.string.cron_missed, event.missed, event.hpLost)
+                    } else {
+                        context.getString(R.string.cron_missed_no_hp, event.missed)
+                    }
+
+                TasksEvent.ActionFailed -> context.getString(R.string.action_failed)
             }
             snackbarHostState.showSnackbar(message)
         }
@@ -71,7 +81,9 @@ fun TasksScreen(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddTask) {
+            // Тип новой задачи наследуется от открытой вкладки — так «+» на вкладке
+            // «Ежедневные» не открывает форму привычки.
+            FloatingActionButton(onClick = { onAddTask(state.selectedTab) }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_task))
             }
         },
@@ -89,15 +101,19 @@ fun TasksScreen(
             TaskTabs(selected = state.selectedTab, onSelect = viewModel::selectTab)
             Spacer(Modifier.height(Dimens.sm))
 
-            if (state.tasks.isEmpty() && !state.loading) {
-                EmptyState(
-                    title = stringResource(R.string.empty_habits_title),
-                    body = stringResource(R.string.empty_habits_body),
-                    cta = stringResource(R.string.empty_cta),
-                    onCta = onAddTask,
-                )
-            } else {
-                LazyColumn(
+            when {
+                state.loading -> TaskListSkeleton()
+                state.tasks.isEmpty() -> {
+                    val copy = emptyCopyFor(state.selectedTab)
+                    EmptyState(
+                        title = copy.title,
+                        body = copy.body,
+                        cta = copy.cta,
+                        onCta = { onAddTask(state.selectedTab) },
+                    )
+                }
+
+                else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(Dimens.screenPadding),
                     verticalArrangement = Arrangement.spacedBy(Dimens.rowGap),
@@ -115,6 +131,29 @@ fun TasksScreen(
             }
         }
     }
+}
+
+private data class EmptyCopy(val title: String, val body: String, val cta: String)
+
+@Composable
+private fun emptyCopyFor(tab: TaskType): EmptyCopy = when (tab) {
+    TaskType.HABIT -> EmptyCopy(
+        title = stringResource(R.string.empty_habits_title),
+        body = stringResource(R.string.empty_habits_body),
+        cta = stringResource(R.string.empty_habits_cta),
+    )
+
+    TaskType.DAILY -> EmptyCopy(
+        title = stringResource(R.string.empty_dailies_title),
+        body = stringResource(R.string.empty_dailies_body),
+        cta = stringResource(R.string.empty_dailies_cta),
+    )
+
+    TaskType.TODO -> EmptyCopy(
+        title = stringResource(R.string.empty_todos_title),
+        body = stringResource(R.string.empty_todos_body),
+        cta = stringResource(R.string.empty_todos_cta),
+    )
 }
 
 @Composable

@@ -3,6 +3,7 @@ package com.example.habittracker.ui.screens.addhabit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +18,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -24,8 +27,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.habittracker.R
 import com.example.habittracker.domain.model.Difficulty
@@ -40,12 +45,22 @@ fun AddHabitScreen(
     viewModel: AddHabitViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val saveErrorText = stringResource(R.string.save_failed)
 
     LaunchedEffect(Unit) {
         viewModel.saved.collect { onDone() }
     }
 
+    LaunchedEffect(state.saveError) {
+        if (state.saveError) {
+            snackbarHostState.showSnackbar(saveErrorText)
+            viewModel.clearSaveError()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.new_task_title)) },
@@ -68,6 +83,7 @@ fun AddHabitScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(Dimens.screenPadding),
             verticalArrangement = Arrangement.spacedBy(Dimens.lg),
@@ -102,7 +118,7 @@ fun AddHabitScreen(
                         onClick = { viewModel.setType(type) },
                         shape = SegmentedButtonDefaults.itemShape(index, TaskType.entries.size),
                     ) {
-                        Text(typeLabel(type))
+                        SegmentText(typeLabel(type))
                     }
                 }
             }
@@ -115,12 +131,23 @@ fun AddHabitScreen(
                         onClick = { viewModel.setDifficulty(difficulty) },
                         shape = SegmentedButtonDefaults.itemShape(index, Difficulty.entries.size),
                     ) {
-                        Text(difficultyLabel(difficulty))
+                        SegmentText(difficultyLabel(difficulty))
                     }
                 }
             }
         }
     }
+}
+
+/** Подпись сегмента: не даём длинному слову разъехаться на узком экране. */
+@Composable
+private fun SegmentText(text: String) {
+    Text(
+        text = text,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        style = MaterialTheme.typography.labelLarge,
+    )
 }
 
 @Composable

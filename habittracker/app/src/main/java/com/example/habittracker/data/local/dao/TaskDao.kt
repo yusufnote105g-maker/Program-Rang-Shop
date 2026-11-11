@@ -1,10 +1,9 @@
 package com.example.habittracker.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.example.habittracker.data.local.entity.TaskEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,7 +20,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE type = 'DAILY' AND archived = 0")
     suspend fun getDailies(): List<TaskEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Upsert, а не REPLACE: REPLACE удаляет старую строку и запускает
+     * ON DELETE CASCADE, из-за чего при повторной вставке того же id
+     * молча пропадала бы вся история из task_logs.
+     */
+    @Upsert
     suspend fun insert(task: TaskEntity)
 
     @Update

@@ -34,7 +34,7 @@ data class TaskLogEntity(
     @ColumnInfo(name = "user_id") val userId: String,
     @ColumnInfo(name = "logged_at") val loggedAt: Long,
     @ColumnInfo(name = "logged_day") val loggedDay: String,
-    val direction: String, // up | down | complete
+    val direction: String, // up | down | complete | miss
     @ColumnInfo(name = "delta_xp") val deltaXp: Int,
     @ColumnInfo(name = "delta_gold") val deltaGold: Int,
     val value: Double,

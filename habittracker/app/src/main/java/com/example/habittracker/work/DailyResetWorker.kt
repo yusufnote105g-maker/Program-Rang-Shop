@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.example.habittracker.data.repository.TaskRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 
 /**
  * Фоновый пересчёт дня (F06): закрывает прошедшие ежедневные, сбрасывает серии
@@ -26,8 +27,16 @@ class DailyResetWorker @AssistedInject constructor(
         repository.ensureUser()
         repository.runDailyCron()
         Result.success()
+    } catch (c: CancellationException) {
+        // Работу отменили (например, приложение закрыли) — это не ошибка БД.
+        throw c
     } catch (t: Throwable) {
         // Сеть не нужна, но БД может быть занята — даём WorkManager повторить.
-        Result.retry()
+        // Бесконечно ретраить постоянную ошибку нельзя: после нескольких попыток сдаёмся.
+        if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
+    }
+
+    private companion object {
+        const val MAX_ATTEMPTS = 3
     }
 }
