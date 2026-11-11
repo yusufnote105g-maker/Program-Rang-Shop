@@ -58,14 +58,20 @@ app/src/androidTest/java/.../data/       TaskRepositoryTest (Room in-memory)
 ## Сборка
 
 В этом окружении JDK/Gradle/Android SDK нет, поэтому APK здесь не собирается.
-Откройте папку `habittracker/` в Android Studio (Ladybug или новее) или:
+Откройте папку `habittracker/` в Android Studio (Ladybug 2024.2.1 или новее,
+JDK 17) или соберите из терминала:
 
 ```bash
+cd habittracker
 ./gradlew :app:assembleDebug
 ```
 
-Gradle wrapper (`gradlew`) не сгенерирован — Android Studio создаст его при первом
-открытии, либо выполните `gradle wrapper --gradle-version 8.9`.
+Готовый APK: `app/build/outputs/apk/debug/app-debug.apk`.
+
+Gradle wrapper 8.9 уже в комплекте (`gradlew`, `gradlew.bat`,
+`gradle/wrapper/`), отдельно устанавливать Gradle не нужно — скрипт сам
+скачает дистрибутив при первом запуске. Для release-сборки понадобится
+свой keystore и `signingConfig`; debug-сборка работает без настроек.
 
 ## Что реализовано (этот срез)
 

@@ -5,6 +5,7 @@
 | ID | дата | статус | заметки |
 | --- | --- | --- | --- |
 | Скелет проекта | 2026-11-11 | done | Gradle (AGP 8.7, Kotlin 2.0, KSP, Hilt), Room, Compose. Собирается в Android Studio; в этом окружении JDK/Gradle/SDK нет. |
+| Gradle wrapper | 2026-11-11 | done | Wrapper 8.9 добавлен (`gradlew`, `gradlew.bat`, `gradle/wrapper/`); `./gradlew :app:assembleDebug` не требует локального Gradle. |
 | S01 список задач | 2026-11-11 | done | Табы типов, шапка игрока, FAB, пустое состояние, snackbar наград. |
 | S02 создание | 2026-11-11 | done | Название/заметки/тип/сложность, валидация, сохранение в Room. |
 | S04 строка привычки | 2026-11-11 | done | Бейджи счётчиков «+N / −M» (`CounterBadge`) рядом с кнопками; при нуле не занимают места. |
@@ -29,7 +30,7 @@
 
 ## Проверки без JVM
 
-В окружении нет JDK/Gradle/Android SDK, поэтому:
+В окружении нет JDK, Android SDK и эмулятора, поэтому:
 
 - `replica/schema.sql` прогнан на реальном SQLite (Python `sqlite3`): таблицы, индексы,
   CHECK-и, каскады и запросы из `TaskDao` выполняются; `direction = 'miss'` принимается;
