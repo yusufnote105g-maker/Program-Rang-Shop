@@ -18,27 +18,29 @@ jobs:
           
       - name: Fix folders and Build
         run: |
-          # 1. Переименовываем папку, если браузер перевел "lib"
-          if [ -d "библиотека" ]; then mv "библиотека" lib; fi
-          
-          # 2. Создаем правильную структуру папок
-          mkdir -p lib/core/utils
-          mkdir -p lib/core/theme
-          mkdir -p lib/features/auth/data
-          mkdir -p lib/features/auth/domain
-          mkdir -p lib/features/auth/presentation/bloc
-          mkdir -p lib/features/auth/presentation/screens
+          # 1. Удаляем папку, если браузер назвал её "библиотека"
+          if [ -d "библиотека" ]; then rm -rf "библиотека"; fi
 
-          # 3. Ищем файлы (где бы они ни лежали) и переносим в нужные папки
-          find . -name "price_formatter.dart" -not -path "*/lib/*" -exec mv {} lib/core/utils/ \;
-          find . -name "app_theme.dart" -not -path "*/lib/*" -exec mv {} lib/core/theme/ \;
-          find . -name "auth_repository.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/domain/ \;
-          find . -name "mock_auth_repository.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/data/ \;
-          find . -name "auth_form_state.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/bloc/ \;
-          find . -name "auth_cubit.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/bloc/ \;
-          find . -name "auth_screen.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/screens/ \;
+          # 2. Создаем правильную структуру папок (на всякий случай)
+          mkdir -p lib/core/utils lib/core/theme
+          mkdir -p lib/features/auth/data lib/features/auth/domain
+          mkdir -p lib/features/auth/presentation/bloc lib/features/auth/presentation/screens
+
+          # 3. Ищем файлы во ВСЕХ папках и перемещаем в нужные места
+          # (Если файла нет, команда не вызовет ошибку благодаря || true)
           
-          # 4. Создаем системные файлы Android и собираем
+          find . -type f -name "price_formatter.dart" -exec mv {} lib/core/utils/ \; || true
+          find . -type f -name "app_theme.dart" -exec mv {} lib/core/theme/ \; || true
+          find . -type f -name "auth_repository.dart" -exec mv {} lib/features/auth/domain/ \; || true
+          find . -type f -name "mock_auth_repository.dart" -exec mv {} lib/features/auth/data/ \; || true
+          find . -type f -name "auth_form_state.dart" -exec mv {} lib/features/auth/presentation/bloc/ \; || true
+          find . -type f -name "auth_cubit.dart" -exec mv {} lib/features/auth/presentation/bloc/ \; || true
+          find . -type f -name "auth_screen.dart" -exec mv {} lib/features/auth/presentation/screens/ \; || true
+
+          # 4. Проверяем, что main.dart лежит там, где надо
+          if [ -f "main.dart" ]; then mv main.dart lib/main.dart; fi
+          
+          # 5. Генерируем Android файлы и собираем
           flutter create . --project-name rang_shop
           flutter pub get
           flutter build apk --release
