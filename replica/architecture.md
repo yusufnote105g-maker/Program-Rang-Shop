@@ -1,117 +1,88 @@
-# Architecture: свой трекер привычек (пересборка ядра Habitica)
+# Architecture: Honey Mart marketplace (User / Owner / Admin)
 
-Источник: `replica/recon.md`, `replica/features.csv`.
-Тип приложения: **локальное Android-приложение** (offline-first, одна БД на устройстве, без сервера).
+Источник: `TheChance101/Honey-Mart-Android-Client` + `Honey-Mart-Server`, README проекта.
+Тип приложения: **клиент-серверный маркетплейс локальных рынков** (покупатель / владелец магазина / админ).
+Бэкенд: **Supabase** (PostgreSQL + Auth + Realtime + Storage) + Edge Functions.
+Date: 2026-11-12
 
 ## Stack
 
 | layer | choice | why |
 | --- | --- | --- |
-| язык | Kotlin | нативный Android, лучшая поддержка корутин и Compose |
-| UI | Jetpack Compose + Material 3 | декларативный UI, темы и dark mode почти бесплатно |
-| архитектура | MVVM + UDF (ViewModel → StateFlow → UI) | состояние живёт в БД, переживает пересоздание процесса |
-| локальная БД | Room (SQLite) | официальный слой над SQLite, миграции, Flow-запросы |
-| DI | Hilt | стандарт, аккуратно связывает ViewModel/Repository/Room |
-| асинхронность | Coroutines + Flow | фоновые операции и реактивные списки |
-| настройки | DataStore (Preferences) | тема, часовой пояс, граница дня |
-| фоновые задачи | WorkManager (+ AlarmManager для точных напоминаний) | ежедневный сброс и напоминания надёжнее, чем таймеры в процессе |
-| время | java.time (core library desugaring) | корректная работа с зонами и DST |
-| ID | UUID (TEXT), генерируется в приложении | в SQLite нет `gen_random_uuid()` |
-| тесты | JUnit, Room in-memory, Turbine, Compose UI test | проверяем и логику, и экраны |
-| сборка | Gradle + KSP | Room/Hilt через KSP |
+| mobile | Kotlin + Jetpack Compose | MVVM + UDF; как в оригинале |
+| модулизация | App Modularization: `:user`, `:owner`, `:admin`, `:core`, `:design_system`, `:buildSrc` | каждая роль — своя feature-line внутри Android-проекта |
+| UI | Compose + Material 3; design system из Figma (`design_system`, токены в `replica/design/`) | |
+| архитектура | MVVM + UDF (ViewModel → StateFlow → UI) | |
+| DI | Hilt | |
+| локальное хранилище | DataStore (JWT/сессия, настройки) | |
+| БД | PostgreSQL на Supabase | единственная БД, RLS включён |
+| сеть | Ktor Client → Supabase (PostgREST + Auth/GoTrue + Realtime) | Ktor Client из оригинала |
+| маппинг | DTO + kotlinx.serialization + ручной mapping | PostgREST отдаёт JSON; ORM не нужен |
+| auth | Supabase Auth (GoTrue) | JWT в SecureStorage |
+| realtime | Supabase Realtime | уведомления о статусе заказа |
+| jobs | Supabase Edge Functions + pg_cron | оформление заказа, одобрение магазина, списание стока |
+| money | integer cents + currency column | ... |
 
-Отличия от дефолта набора (и почему):
-
-- **Нет web/Next.js** — продукт целиком на устройстве.
-- **Нет Postgres/Supabase** — база локальная, SQLite через Room. Одна БД.
-- **Нет auth** — один пользователь, вход не нужен; защита = песочница приложения.
-- **Нет payments/email/jobs-в-облаке** — вне среза; напоминания делает WorkManager локально.
-- **SQLite, а не Postgres** — поэтому `id text` (UUID из кода), время `integer` (epoch millis UTC),
-  а не `uuid`/`timestamptz`; RLS недоступен.
-
-Опционально (не в этом срезе): экспорт/импорт JSON-бэкапа, чтобы данные не терялись при
-удалении приложения. Облачная синхронизация — только если позже понадобится несколько устройств.
+Отличия от набора Habitica (предыдущий прогон в этом файле): теперь **клиент-сервер, Supabase вместо Room**, RLS вместо скоупа по `user_id`.
 
 ## Schema
 
-Таблицы: **5** (`users`, `tasks`, `tags`, `task_tags`, `task_logs`).
-Правила доступа: **RLS нет** (локальная БД). Доступ = один пользователь; в data-слое всё
-скоупится по `user_id`, а БД лежит в приватном каталоге приложения. SQL см. `replica/schema.sql`.
+Таблицы: **5** — `profiles`, `stores`, `products`, `orders`, `order_items`.
+SQL: `replica/schema.sql` (PostgreSQL/Supabase + RLS).
 
-Ключевые жёсткие ограничения (это проблемы БД, а не UI):
+- `profiles`: id (→ `auth.users.id`), email, full_name, phone, **role** (`customer` / `owner` / `admin`), timestamps.
+- `stores`: id, owner_id (→ `profiles`), name, description, category, address…, status (`pending` / `approved` / `rejected` / `suspended`).
+- `products`: id, store_id (→ `stores`), owner_id (→ `profiles`), name, description, price (integer cents), currency, stock, category, image_url, status (`draft` / `active` / `archived`).
+- `orders`: id, user_id (→ `profiles`, покупатель), store_id (→ `stores`), status (`pending` / `confirmed` / `preparing` / `ready` / `completed` / `cancelled`), total (integer cents), currency, customer_* snapshot, note, placed_at, timestamps.
+- `order_items`: id, order_id (→ `orders`), product_id (→ `products`, set null), store_id (→ `stores`), product_name (snapshot), price (integer cents, snapshot), currency, quantity.
 
-- **Идемпотентность ежедневного сброса** — `users.last_cron_day` (`YYYY-MM-DD` в локальной зоне).
-  Сброс выполняется только если день сменился. Защищает от двойного сброса при ретраях WorkManager
-  и множественных запусках приложения.
-- **Атомарность отметки** — `counter_up`/`counter_down` меняются внутри одной транзакции вместе
-  с записью в `task_logs` (`UPDATE ... SET counter_up = counter_up + 1`), чтобы быстрые тапы не теряли счёт.
-- **Streak** — считается из `last_completed_day` и текущего локального дня, а не из таймера.
-- **Сложность** ограничена `check`, `type` ограничен `check`, статусные поля — через `check`.
-- Время везде — `integer` (epoch millis, UTC); «день» — `YYYY-MM-DD` в локальной зоне.
+Ключевые ограничения:
+
+- Денежные суммы — **integer cents + currency** (не float/decimal).
+- Время — `timestamptz` (UTC).
+- Заказ = покупка из одного магазина (`store_id`); состав — `order_items` с снапшотом цены/имени.
+- Статусные поля — `check` constraints.
+- Идемпотентность оформления заказа + атомарное списание стока (`stock >= quantity`).
+
+## Access / RLS
+
+RLS включён на всех таблицах; вспомогательные `security definer` функции:
+`public.current_role()`, `public.is_admin()`, `public.is_store_owner(store_id)`, `public.is_approved_store(store_id)`, `public.can_read_order(order_id, user_id)`.
+
+- **Customer**: свои `orders` (select/insert/update pending), `products`: только `active` у одобренных магазинов, `stores`: только `approved`.
+- **Owner**: свои `stores` (insert/select/update), свои `products` (insert/select/update через `owner_id` + `is_store_owner`), `orders` своих магазинов (update статуса).
+- **Admin**: все `stores` / `products` / `orders` (select/update), в т.ч. смена статуса магазина (`pending → approved / rejected / suspended`).
 
 ## API
 
-HTTP-сервера нет. «API» здесь — операции репозитория/UseCase (контракт между ViewModel и данными).
-Одна операция на поток из recon (F01–F06) плюс CRUD.
+PostgREST-эндпоинты Supabase + Edge Functions:
 
-| operation | does | who | input | output | flow |
+| method path | what it does | who can call | input | output | flow |
 | --- | --- | --- | --- | --- | --- |
-| `tasks.create(...)` | создать привычку/задачу | локальный пользователь | TaskDraft | taskId | F01 |
-| `tasks.observeByType(type)` | реактивный список | UI | type | Flow<List<Task>> | S01 |
-| `tasks.tapPlus(id)` | положительная отметка | UI | taskId | RewardResult | F02 |
-| `tasks.tapMinus(id)` | отрицательная отметка | UI | taskId | RewardResult | F03 |
-| `tasks.completeTodo(id)` | закрыть to-do | UI | taskId | RewardResult | F02 |
-| `tasks.edit(id, patch)` | изменить | UI | TaskPatch | Unit | F04 |
-| `tasks.delete(id)` | удалить | UI | taskId | Unit | F05 |
-| `tasks.reorder(ids)` | ручной порядок | UI | ordered ids | Unit | S01 |
-| `tasks.setReminder(id, at)` | напоминание | UI | taskId, instant | Unit | S08 |
-| `tags.create/rename/delete` | теги | UI | TagDraft | tagId | S02 |
-| `tags.attach/detach(taskId, tagId)` | привязка тега | UI | ids | Unit | S02 |
-| `cron.runDailyReset(now)` | пересчёт Dailies/streak/HP | система | now | ResetReport | F06 |
-| `stats.snapshot()` | агрегаты для шапки/аналитики | UI | — | UserStats | S01 |
-| `backup.export/import()` | JSON-бэкап (опция) | пользователь | uri | Unit | — |
-
-Webhooks: нет (нет сервера).
-
-Jobs (WorkManager):
-
-| job | schedule | what it does |
-| --- | --- | --- |
-| `DailyResetWorker` | ежедневно на границе дня + догон при запуске приложения | идемпотентный сброс Dailies, streak, штрафы по HP |
-| `ReminderWorker` | `OneTimeWorkRequest` под каждый `reminder_at` | локальное уведомление, перепланирование после срабатывания |
-| `BackupWorker` (опция) | вручную/раз в неделю | экспорт JSON в хранилище |
-
-Если позже появится синхронизация — эти же операции ложатся на REST
-(`GET /tasks?type=`, `POST /tasks`, `POST /tasks/{id}/log`, `POST /cron/daily`).
+| POST /auth/v1/token?grant_type=password | вход (GoTrue) → JWT | user | credentials | tokens | auth |
+| GET /rest/v1/stores?status=eq.approved | каталог одобренных магазинов | anon/customer | — | stores | browse |
+| GET /rest/v1/products?store_id=eq.&status=eq.active | товары магазина | customer | store_id | products | catalog |
+| POST /rest/v1/orders | оформление заказа | customer (user_id = auth.uid()) | order + items | order | order |
+| GET /rest/v1/orders?user_id=eq. | свои заказы | customer | user_id | orders | orders |
+| PATCH /rest/v1/orders?id=eq.&status=eq.pending | отмена заказа | customer (свой, pending) | status | order | orders |
+| PATCH /rest/v1/stores?id=eq.&status=eq.approved | одобрение магазина | admin | status | store | admin |
+| POST /functions/v1/stores | создать магазин | owner | store data | store (pending) | owner |
+| POST /functions/v1/orders | атомарное оформление заказа | customer | cart | order+items | order |
 
 ## The parts that bite
 
-- **Часовые пояса и DST:** «день» считается в зоне пользователя (`users.timezone`), а не в UTC.
-  Храним UTC, группируем по локальному `YYYY-MM-DD`. Переход на летнее время меняет длину суток —
-  границу дня задаём минутами после местной полуночи (`day_start_minutes`), а не фиксированным часом UTC.
-- **Идемпотентность:** сброс дня и напоминания могут запускаться повторно (ретраи WorkManager,
-  перезагрузка телефона). Защита — `last_cron_day` и уникальность «события на день».
-- **Гонки:** быстрые тапы «+/−» и одновременный cron-сброс. Решение — транзакции Room и атомарные
-  инкременты счётчиков; награда считается от снапшота `value` в момент действия.
-- **Оффлайн:** приложение и так оффлайн, синка нет; риск — потеря данных при удалении. Смягчаем
-  опциональным экспортом.
-- **Уведомления (Android 13+):** нужно разрешение `POST_NOTIFICATIONS`; на Android 12+ точные
-  будильники требуют `SCHEDULE_EXACT_ALARM`, а агрессивная экономия батареи может их глушить —
-  поэтому напоминания best-effort + догон при открытии приложения.
-- **Миграции Room:** схема будет меняться — версионируем и пишем `Migration`, иначе падение на старте.
-- **Производительность списка:** при большом числе задач — `LazyColumn` + индексы; при необходимости Paging.
+- **Idempotency**: оформление заказа (двойной тап) — idempotency key / уникальность.
+- **Race conditions**: списание стока — атомарный `UPDATE ... WHERE stock >= qty`.
+- **Money**: integer cents + currency; `total = sum(price*quantity)`.
+- **Realtime**: уведомления о смене статуса заказа (Supabase Realtime).
+- **RLS**: security definer функции; `auth.users.id = profiles.id`.
 
 ## Build order
 
-1. **Вертикальный срез:** S01 + S02 + S04 + S05; таблицы `users`, `tasks`, `task_logs`;
-   операции `create` / `observeByType` / `tapPlus` → увидеть награду. Доказывает связку
-   Compose ↔ Room ↔ ViewModel.
-2. **Must-haves:** `tapMinus`, `completeTodo`, streaks, `DailyResetWorker`, edit/delete, табы, оффлайн-хранение.
-3. **Should-haves:** level-up, потеря HP, пустое состояние, теги, напоминания, контекстное меню.
-4. **Could-haves:** виджет, аналитика/графики, темы.
-5. **Фиксы от `replica-entrepreneur`** — после того как он отработает по отзывам.
+1. **Вертикальный срез**: вход → каталог одобренных магазинов → товар → корзина → заказ; owner: магазин → pending; admin: approve; owner: product draft→active.
+2. Must-haves: owner CRUD товаров, статусы заказов, wishlist, поиск.
+3. Should/could: coupons, realtime-уведомления, аналитика.
 
 ## Next
 
-`replica/schema.sql` — готовая DDL. Следующий шаг: `@replica-design` — токены, цвета, типографика
-и спеки компонентов из списка в recon.
+`replica/schema.sql` — DDL с RLS — готова. Следующий шаг: `@replica-design` — дизайн-система и токены.
