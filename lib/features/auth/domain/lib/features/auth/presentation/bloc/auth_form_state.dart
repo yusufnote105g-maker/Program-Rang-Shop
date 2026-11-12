@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
-
-import '../../domain/repositories/auth_repository.dart';
+import 'package:rang_shop/features/auth/domain/repositories/auth_repository.dart';
 
 enum AuthFormStatus { initial, loading, success, error }
 
