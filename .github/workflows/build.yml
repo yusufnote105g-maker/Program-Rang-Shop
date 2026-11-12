@@ -16,18 +16,31 @@ jobs:
           flutter-version: '3.27.4'
           channel: 'stable'
           
-      - name: Generate Android files and Build
+      - name: Fix folders and Build
         run: |
-          # Переименовываем папку "библиотека" обратно в "lib", если она так называется
+          # 1. Переименовываем папку, если браузер перевел "lib"
           if [ -d "библиотека" ]; then mv "библиотека" lib; fi
           
-          # Создаем недостающие системные папки (android, ios) на основе нашего pubspec.yaml
+          # 2. Создаем правильную структуру папок
+          mkdir -p lib/core/utils
+          mkdir -p lib/core/theme
+          mkdir -p lib/features/auth/data
+          mkdir -p lib/features/auth/domain
+          mkdir -p lib/features/auth/presentation/bloc
+          mkdir -p lib/features/auth/presentation/screens
+
+          # 3. Ищем файлы (где бы они ни лежали) и переносим в нужные папки
+          find . -name "price_formatter.dart" -not -path "*/lib/*" -exec mv {} lib/core/utils/ \;
+          find . -name "app_theme.dart" -not -path "*/lib/*" -exec mv {} lib/core/theme/ \;
+          find . -name "auth_repository.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/domain/ \;
+          find . -name "mock_auth_repository.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/data/ \;
+          find . -name "auth_form_state.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/bloc/ \;
+          find . -name "auth_cubit.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/bloc/ \;
+          find . -name "auth_screen.dart" -not -path "*/lib/*" -exec mv {} lib/features/auth/presentation/screens/ \;
+          
+          # 4. Создаем системные файлы Android и собираем
           flutter create . --project-name rang_shop
-          
-          # Скачиваем зависимости
           flutter pub get
-          
-          # Собираем APK
           flutter build apk --release
           
       - name: Upload APK
