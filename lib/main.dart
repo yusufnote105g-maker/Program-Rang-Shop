@@ -1,14 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'core/theme/app_theme.dart';
-import 'core/utils/price_formatter.dart';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // ВСТАВЬ СЮДА СВОЙ КЛЮЧ (тот, что начинается на sb_publish...)
-  const String supabaseAnonKey = 'ВСТАВЬ_СЮДА_КЛЮЧ_sb_publish...';
+  // ВСТАВЬ СЮДА СВОЙ КЛЮЧ (начинается на sb_publish...)
+  const String supabaseAnonKey = 'sb_publishable_LmQxA96C5NsSJf2YV-CoFQ_GyHhhfw0';
   
   await Supabase.initialize(
     url: 'https://kuyyrmxjplglqdfffyre.supabase.co',
@@ -33,64 +27,15 @@ class RangShopApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeMode,
-            home: const FoundationCheckScreen(),
+            // ВОТ ГЛАВНОЕ ИЗМЕНЕНИЕ: ЗАПУСКАЕМ ЭКРАН ВХОДА
+            home: AuthScreen(
+              repository: MockAuthRepository(),
+              onAuthSuccess: (user) {
+                print('Вход выполнен! Роль: ${user.role}');
+              },
+            ),
           );
         },
-      ),
-    );
-  }
-}
-
-class FoundationCheckScreen extends StatelessWidget {
-  const FoundationCheckScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Rang Shop — Ready'),
-        actions: [
-          IconButton(
-            onPressed: () => context.read<ThemeCubit>().toggleTheme(),
-            icon: Icon(
-              theme.brightness == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-            ),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.verified_outlined,
-                size: 56,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Supabase подключен успешно!',
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Цена из БД (45000 дирамов): ${PriceFormatter.formatFromDirams(45000)}',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
