@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/data/mock_auth_repository.dart';
+import 'features/auth/data/repositories/mock_auth_repository.dart';
 import 'features/auth/presentation/screens/auth_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // ВСТАВЬ СЮДА СВОЙ КЛЮЧ (начинается на sb_publish...)
+  // ВСТАВЬ СЮДА СВОЙ КЛЮЧ ИЗ SUPABASE
   const String supabaseAnonKey = 'sb_publishable_LmQxA96C5NsSJf2YV-CoFQ_GyHhhfw0';
   
   await Supabase.initialize(
@@ -34,6 +34,7 @@ class RangShopApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeMode,
+            // ЗАПУСКАЕМ ЭКРАН АВТОРИЗАЦИИ
             home: AuthScreen(
               repository: MockAuthRepository(),
               onAuthSuccess: (user) {
