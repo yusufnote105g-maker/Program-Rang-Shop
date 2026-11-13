@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:rang_shop/core/state/app_cubits.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rang_shop/core/localization/app_localizations.dart';
@@ -192,7 +194,10 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                       const SizedBox(height: 32),
                       FilledButton(
-                        onPressed: () => context.go('/main'),
+                        onPressed: () {
+                          context.read<AuthSessionCubit>().signIn();
+                          context.go('/main');
+                        },
                         child: Text(t.translate('confirm')),
                       ),
                       const SizedBox(height: 24),
