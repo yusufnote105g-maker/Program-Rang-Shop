@@ -16,6 +16,9 @@ jobs:
           flutter-version: '3.27.4'
           channel: 'stable'
           
+      - name: Очистить кэш
+        run: flutter clean
+
       - name: Install dependencies and build
         run: |
           flutter create . --platforms=android --project-name rang_shop
