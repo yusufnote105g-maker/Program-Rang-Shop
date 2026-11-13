@@ -1,30 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rang_shop/core/localization/app_localizations.dart';
 import 'package:rang_shop/core/localization/fallback_localizations.dart';
 import 'package:rang_shop/core/localization/locale_cubit.dart';
+import 'package:rang_shop/core/network/supabase_service.dart';
 import 'package:rang_shop/core/router/app_router.dart';
 import 'package:rang_shop/core/theme/app_theme.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // >>> ВАЖНО: перенесите сюда существующую инициализацию Supabase
-  // >>> из СТАРОГО main.dart (вызов из lib/core/network/supabase_service.dart).
-  // >>> Не удаляйте её и не меняйте supabase_service.dart.
+
+  try {
+    await SupabaseService.initialize();
+  } catch (e, stackTrace) {
+    debugPrint('Supabase initialization failed: $e');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
 
   runApp(const RangShopApp());
 }
 
+
 class RangShopApp extends StatelessWidget {
   const RangShopApp({super.key});
+
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
-        BlocProvider<LocaleCubit>(create: (_) => LocaleCubit()),
+        BlocProvider<ThemeCubit>(
+          create: (_) => ThemeCubit(),
+        ),
+        BlocProvider<LocaleCubit>(
+          create: (_) => LocaleCubit(),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {
@@ -37,7 +49,10 @@ class RangShopApp extends StatelessWidget {
                 darkTheme: AppTheme.dark,
                 themeMode: themeMode,
                 locale: locale,
-                supportedLocales: AppLocalizations.supportedLocales,
+                supportedLocales: const [
+                  Locale('ru'),
+                  Locale('tg'),
+                ],
                 localizationsDelegates: appLocalizationsDelegates,
                 routerConfig: AppRouter.router,
               );
