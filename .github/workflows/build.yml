@@ -48,8 +48,8 @@ jobs:
       - name: Установить Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
-          cache: true
+          flutter-version: '3.27.4'
+          channel: 'stable'
 
 
       - name: Создать папку android, если её нет
