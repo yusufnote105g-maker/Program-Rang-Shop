@@ -59,6 +59,7 @@ jobs:
           else
             flutter create . --platforms=android --project-name rang_shop
           fi
+          rm -rf test
 
 
       - name: Вернуть наш код, если flutter create что-то изменил
