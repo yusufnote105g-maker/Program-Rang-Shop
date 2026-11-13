@@ -1,5 +1,5 @@
 name: rang_shop
-description: Rang Shop Marketplace
+description: Rang Shop Fashion & Beauty
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -11,6 +11,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  go_router: ^14.2.0
   flutter_bloc: ^8.1.6
   equatable: ^2.0.5
   supabase_flutter: ^2.6.0

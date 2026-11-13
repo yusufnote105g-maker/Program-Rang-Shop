@@ -1,67 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:rang_shop/core/network/supabase_service.dart';
+import 'package:rang_shop/core/localization/app_localizations.dart';
+import 'package:rang_shop/core/localization/fallback_localizations.dart';
+import 'package:rang_shop/core/localization/locale_cubit.dart';
+import 'package:rang_shop/core/router/app_router.dart';
 import 'package:rang_shop/core/theme/app_theme.dart';
-import 'package:rang_shop/features/auth/data/repositories/mock_auth_repository.dart';
-import 'package:rang_shop/features/auth/domain/repositories/auth_repository.dart';
-import 'package:rang_shop/features/catalog/data/repositories/mock_product_repository.dart';
-import 'package:rang_shop/features/catalog/domain/repositories/product_repository.dart';
-import 'package:rang_shop/features/catalog/presentation/screens/home_screen.dart';
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // >>> ВАЖНО: перенесите сюда существующую инициализацию Supabase
+  // >>> из СТАРОГО main.dart (вызов из lib/core/network/supabase_service.dart).
+  // >>> Не удаляйте её и не меняйте supabase_service.dart.
 
-  // Ошибка Supabase не должна оставлять пустой экран: приложение
-  // запускается в любом случае, пока работает на моках.
-  try {
-    await SupabaseService.initialize();
-  } catch (error, stackTrace) {
-    debugPrint('Supabase не инициализирован: $error\n$stackTrace');
-  }
-
-
-  // Репозитории создаются один раз, чтобы не терять состояние
-  // при пересборке приложения (например, при смене темы).
-  // MockAuthRepository работает только в debug-сборке.
-  runApp(
-    RangShopApp(
-      authRepository: MockAuthRepository(),
-      productRepository: const MockProductRepository(),
-    ),
-  );
+  runApp(const RangShopApp());
 }
 
-
 class RangShopApp extends StatelessWidget {
-  const RangShopApp({
-    super.key,
-    required this.authRepository,
-    required this.productRepository,
-  });
-
-
-  final AuthRepository authRepository;
-  final ProductRepository productRepository;
-
+  const RangShopApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ThemeCubit>(
-      create: (_) => ThemeCubit(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
+        BlocProvider<LocaleCubit>(create: (_) => LocaleCubit()),
+      ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
-        builder: (BuildContext context, ThemeMode themeMode) {
-          return MaterialApp(
-            title: 'Rang Shop',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeMode,
-            home: HomeScreen(
-              authRepository: authRepository,
-              productRepository: productRepository,
-            ),
+        builder: (context, themeMode) {
+          return BlocBuilder<LocaleCubit, Locale>(
+            builder: (context, locale) {
+              return MaterialApp.router(
+                title: 'Rang Shop',
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: themeMode,
+                locale: locale,
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates: appLocalizationsDelegates,
+                routerConfig: AppRouter.router,
+              );
+            },
           );
         },
       ),

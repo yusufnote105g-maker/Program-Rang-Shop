@@ -1,34 +1,33 @@
-// lib/core/utils/price_formatter.dart
-
-
-import 'package:intl/intl.dart';
-
-
+/// Форматирует цену из дирамов (целое число, 100 дирамов = 1 сомони)
+/// в строку вида "129 TJS" или "5 000 TJS" (как на макетах).
 class PriceFormatter {
-  const PriceFormatter._();
+  PriceFormatter._();
 
-
-  static final NumberFormat _wholeFormatter = NumberFormat('#,##0', 'ru');
-  static final NumberFormat _decimalFormatter = NumberFormat('#,##0.00', 'ru');
-
+  /// Если нужно вернуть "с." — поменяйте только эту константу.
+  static const String currency = 'TJS';
 
   static String formatFromDirams(int dirams) {
-    final int wholeSomoni = dirams ~/ 100;
-    final int remainderDirams = dirams.remainder(100).abs();
+    final negative = dirams < 0;
+    final abs = dirams.abs();
+    final whole = abs ~/ 100;
+    final fraction = abs % 100;
 
+    final fractionPart =
+        fraction == 0 ? '' : ',${fraction.toString().padLeft(2, '0')}';
 
-    if (remainderDirams == 0) {
-      return '${_wholeFormatter.format(wholeSomoni)}\u00A0с.';
-    }
-
-
-    final double exactAmount = dirams / 100.0;
-    return '${_decimalFormatter.format(exactAmount)}\u00A0с.';
+    return '${negative ? '-' : ''}${_group(whole)}$fractionPart $currency';
   }
 
-
-  static String formatSomoni(num somoni) {
-    final int dirams = (somoni * 100).round();
-    return formatFromDirams(dirams);
+  static String _group(int value) {
+    final digits = value.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      final remaining = digits.length - i;
+      buffer.write(digits[i]);
+      if (remaining > 1 && remaining % 3 == 1) {
+        buffer.write('\u00A0');
+      }
+    }
+    return buffer.toString();
   }
 }

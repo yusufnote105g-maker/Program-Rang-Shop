@@ -1,144 +1,150 @@
-// lib/core/theme/app_theme.dart
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
+/// Палитра Rang Shop (по макетам: тёмно-фиолетовая тема).
 class AppColors {
-  const AppColors._();
+  AppColors._();
 
+  static const Color accent = Color(0xFF8A2BE2);
+  static const Color accentLight = Color(0xFFB57BEE);
+  static const Color star = Color(0xFFFFB800);
+  static const Color discount = Color(0xFFE5173F);
 
-  static const Color brandPurple = Color(0xFF7C3AED);
-  static const Color brandPurpleDisabled = Color(0x807C3AED);
-  static const Color errorRed = Color(0xFFE53935);
-  static const Color alifGreen = Color(0xFF00C853);
+  static const Color darkBackground = Color(0xFF0B0612);
+  static const Color darkSurface = Color(0xFF171025);
+  static const Color darkSurfaceHigh = Color(0xFF21173A);
+  static const Color darkOutline = Color(0xFF3A2A5C);
 
-
-  static const Color darkBackground = Color(0xFF121212);
-  static const Color darkCard = Color(0xFF1E1E1E);
-  static const Color darkTextPrimary = Color(0xFFFFFFFF);
-  static const Color darkTextSecondary = Color(0xFFAAAAAA);
-
-
-  static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightCard = Color(0xFFF5F5F5);
-  static const Color lightTextPrimary = Color(0xFF121212);
-  static const Color lightTextSecondary = Color(0xFF666666);
+  static const Color lightBackground = Color(0xFFF7F3FC);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightSurfaceHigh = Color(0xFFEFE6FA);
+  static const Color lightOutline = Color(0xFFD8C9EE);
 }
 
-
+/// Управляет режимом темы. По макетам приложение стартует в тёмной теме.
 class ThemeCubit extends Cubit<ThemeMode> {
   ThemeCubit() : super(ThemeMode.dark);
 
-
-  void toggleTheme() {
-    emit(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+  void setThemeMode(ThemeMode mode) {
+    if (mode != state) emit(mode);
   }
 
-
-  void setThemeMode(ThemeMode mode) => emit(mode);
+  void toggle() {
+    emit(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+  }
 }
 
-
 class AppTheme {
-  const AppTheme._();
+  AppTheme._();
 
+  static ThemeData get dark => _build(_darkScheme, AppColors.darkBackground);
+  static ThemeData get light => _build(_lightScheme, AppColors.lightBackground);
 
-  static ThemeData get lightTheme => _createTheme(
-        brightness: Brightness.light,
-        background: AppColors.lightBackground,
-        card: AppColors.lightCard,
-        textPrimary: AppColors.lightTextPrimary,
-        textSecondary: AppColors.lightTextSecondary,
-      );
+  // Алиасы на случай, если старый код использует эти имена.
+  static ThemeData get darkTheme => dark;
+  static ThemeData get lightTheme => light;
 
+  static const ColorScheme _darkScheme = ColorScheme(
+    brightness: Brightness.dark,
+    primary: AppColors.accent,
+    onPrimary: Colors.white,
+    primaryContainer: Color(0xFF3B1A66),
+    onPrimaryContainer: Color(0xFFE9D7FF),
+    secondary: AppColors.accentLight,
+    onSecondary: Colors.black,
+    secondaryContainer: Color(0xFF2A1450),
+    onSecondaryContainer: Color(0xFFE3CCFF),
+    error: Color(0xFFFF5C7A),
+    onError: Colors.white,
+    surface: AppColors.darkSurface,
+    onSurface: Colors.white,
+    surfaceContainerHighest: AppColors.darkSurfaceHigh,
+    onSurfaceVariant: Color(0xFFB9AECF),
+    outline: AppColors.darkOutline,
+    outlineVariant: Color(0xFF2B1F46),
+  );
 
-  static ThemeData get darkTheme => _createTheme(
-        brightness: Brightness.dark,
-        background: AppColors.darkBackground,
-        card: AppColors.darkCard,
-        textPrimary: AppColors.darkTextPrimary,
-        textSecondary: AppColors.darkTextSecondary,
-      );
+  static const ColorScheme _lightScheme = ColorScheme(
+    brightness: Brightness.light,
+    primary: AppColors.accent,
+    onPrimary: Colors.white,
+    primaryContainer: Color(0xFFEBD9FF),
+    onPrimaryContainer: Color(0xFF3B1A66),
+    secondary: AppColors.accentLight,
+    onSecondary: Colors.white,
+    secondaryContainer: Color(0xFFEBD9FF),
+    onSecondaryContainer: Color(0xFF3B1A66),
+    error: Color(0xFFD62048),
+    onError: Colors.white,
+    surface: AppColors.lightSurface,
+    onSurface: Color(0xFF1B1230),
+    surfaceContainerHighest: AppColors.lightSurfaceHigh,
+    onSurfaceVariant: Color(0xFF6B5F82),
+    outline: AppColors.lightOutline,
+    outlineVariant: Color(0xFFE6DAF5),
+  );
 
-
-  static ThemeData _createTheme({
-    required Brightness brightness,
-    required Color background,
-    required Color card,
-    required Color textPrimary,
-    required Color textSecondary,
-  }) {
-    final ColorScheme colorScheme = ColorScheme(
-      brightness: brightness,
-      primary: AppColors.brandPurple,
-      onPrimary: Colors.white,
-      secondary: AppColors.brandPurple,
-      onSecondary: Colors.white,
-      error: AppColors.errorRed,
-      onError: Colors.white,
-      surface: background,
-      onSurface: textPrimary,
-      surfaceContainerHighest: card,
-    );
-
+  static ThemeData _build(ColorScheme scheme, Color background) {
+    const buttonText = TextStyle(fontSize: 16, fontWeight: FontWeight.w600);
 
     return ThemeData(
       useMaterial3: true,
-      brightness: brightness,
-      primaryColor: AppColors.brandPurple,
+      brightness: scheme.brightness,
+      colorScheme: scheme,
       scaffoldBackgroundColor: background,
-      cardColor: card,
-      colorScheme: colorScheme,
-      appBarTheme: AppBarTheme(
-        backgroundColor: background,
-        foregroundColor: textPrimary,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: card,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        hintStyle: TextStyle(color: textSecondary, fontSize: 15),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.brandPurple, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: const BorderSide(color: AppColors.errorRed, width: 1.5),
+      // Все кнопки — StadiumBorder.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(64, 52),
+          shape: const StadiumBorder(),
+          textStyle: buttonText,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.brandPurple,
+          backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: AppColors.brandPurpleDisabled,
-          disabledForegroundColor: Colors.white70,
           elevation: 0,
-          minimumSize: const Size(64, 56),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          minimumSize: const Size(64, 52),
+          shape: const StadiumBorder(),
+          textStyle: buttonText,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.onSurface,
+          minimumSize: const Size(64, 52),
+          shape: const StadiumBorder(),
+          side: const BorderSide(color: AppColors.accent),
+          textStyle: buttonText,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.accentLight,
+          shape: const StadiumBorder(),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
+        shape: StadiumBorder(),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        height: 68,
+        elevation: 0,
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.secondaryContainer,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
       ),
     );
